@@ -1,0 +1,59 @@
+#!/bin/bash
+
+function errexit() {
+    echo -e "$1"
+    exit 1
+}
+
+function msgAndWait() {
+    local msg=$1
+
+    echo $msg
+    echo "Hit enter to continue."
+    read xxx
+}
+
+tmpDir=~/tmp/citadel-tmp
+mkdir -p $tmpDir
+cd $tmpDir
+
+[ $EUID -eq 0 ] && sudo="" || sudo="sudo"
+
+img="$tmpDir/$1"
+[ "$img" == "" ] && errexit "? No IMG specified"
+
+dest="$2"
+[ "$dest" == "" ] && errexit "? No destination specified"
+
+msgAndWait "Insert the SD writer, then insert the USB key stick. Close dialog boxes when they pop up."
+
+echo "Before umount"
+echo ""
+lsblk
+$sudo umount /media/rkawala/*
+echo ""
+echo "After umount"
+echo ""
+lsblk
+
+echo ""
+msgAndWait "The SD writer should be /dev/sdb. The USB key stick should be /dev/sdc. The MOUNTPOINTS column should be empty."
+
+$sudo /usr/local/sdm/sdm-make-luks-usb-key /dev/sdc --init
+
+echo ""
+msgAndWait "Copy the keyfile path to the clipboard."
+
+keyfilepath=$(wl-paste -n)
+msgAndWait "Is $keyfilepath correct? Stop the script if not."
+
+sudo parted /dev/sdb mklabel msdos
+
+msgAndWait "About to do the burn."
+
+time $sudo /usr/local/bin/sdm --burn $dest --host citadel --plugin cryptroot:"crypto=aes|nopwd=y|keyfile=$keyfilepath" --expand-root --regen-ssh-host-keys --nowait-timesync $img --convert-root btrfs
+
+echo ""
+echo "Ejecting /dev/sdb and /dev/sdc."
+$sudo eject /dev/sdb
+$sudo eject /dev/sdc

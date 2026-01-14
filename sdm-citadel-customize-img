@@ -1,0 +1,84 @@
+#!/bin/bash
+#
+# I started with ezsdm, then I made customizations from the gist at
+# https://gist.github.com/andrewharle/0a0558a7438e6967f10c6e7b21efb7bd
+
+function errexit() {
+    echo -e "$1"
+    exit 1
+}
+
+tmpDir=~/tmp/citadel-tmp
+mkdir -p $tmpDir
+cd $tmpDir
+
+[ $EUID -eq 0 ] && sudo="" || sudo="sudo"
+
+img="$1"
+[ "$img" == "" ] && errexit "? No IMG specified"
+
+[ "$(type -t sdm)" == "" ] && errexit "? sdm is not installed"
+
+read -sp "Enter rkawala password: " user_pass
+echo -e "\n**** REDACT THIS **** user_pass is $user_pass"
+user_pass=$(mkpasswd --method=SHA-512 --rounds=4096 $user_pass)
+
+#[ "$sudo" != "" ] && assets="." || assets="/etc/sdm/local-assets"
+assets="."
+rm -f $assets/my.plugins.1
+[ -f $assets/my.plugins ] &&  mv $assets/my.plugins $assets/my.plugins.1
+
+(cat <<EOF
+# Plugin List generated $(date +"%Y-%m-%d %H:%M:%S")
+EOF
+    ) | bash -c "cat >|$assets/my.plugins"
+
+# Note that variable substitution will take place in this heredoc: $user_pass needs it
+(cat <<EOF
+
+# Delete user pi if it exists
+user:deluser=pi
+
+# Add citadel users.
+# I'm not sure if sdm generates the same /etc/group file that you get when you do a manual install.
+
+user:adduser=rkawala|password-hash=$user_pass|uid=1000|groups=rkawala,users,adm,dialout,audio,netdev,video,plugdev,cdrom,games,input,gpio,spi,i2c,render,sudo
+user:adduser=git|uid=1001|groups=git,users|nosudo
+
+# Install apps
+apps:name=mybrowsers|apps=firefox,chromium-browser
+apps:name=mytools|apps=keychain,lsof,iperf3,dnsutils
+
+# I took this list from andrewharle's gist. I omitted overlayroot.
+apps:name=coretools|apps=btrfs-progs,f2fs-tools,extrepo,git,apt-transport-https,nano,gpg,ca-certificates,apt-offline,f3,wl-clipboard
+apps:name=cryptoapps|apps=keepassxc
+apps:name=encryption-drivers|apps=cryptsetup,cryptsetup-initramfs,busybox,systemd-cryptsetup
+
+# Configure network manually once the image boots. SDM is capable of doing
+# the config, but I'm keeping it simple for now.
+
+# This configuration eliminates the need for piwiz so disable it
+# I don't use Bluetooth on my citadel, and it's a possible security problem, so disable it.
+disables:"piwiz|bluetooth"
+
+# Uncomment to enable trim on all disks
+# https://github.com/gitbls/sdm/blob/master/Docs/Plugins.md#trim-enable
+#trim-enable
+
+# Configure localization settings to the same as this system
+# https://github.com/gitbls/sdm/blob/master/Docs/Plugins.md#l10n
+L10n:host
+
+EOF
+    ) | bash -c "cat >>$assets/my.plugins"
+
+rm -f $img
+echo "Extracting $img"
+time unxz -k ~/Downloads/$img.xz
+mv ~/Downloads/$img .
+chmod 600 $img
+echo ""
+
+echo "--apt-dist-upgrade is not turned on, nor is --redact"
+
+time $sudo /usr/local/bin/sdm --customize $img --plugin @$assets/my.plugins --extend --xmb 512 --restart --regen-ssh-host-keys --showapt --aptcache localhost
