@@ -37,7 +37,7 @@ echo ""
 lsblk
 
 echo ""
-msgAndWait "The SD writer should be /dev/sdb. The USB key stick should be /dev/sdc. The MOUNTPOINTS column should be empty."
+msgAndWait "The SD writer should be /dev/mmcblk0. The USB key stick should be /dev/sdc. The MOUNTPOINTS column should be empty."
 
 $sudo /usr/local/sdm/sdm-make-luks-usb-key /dev/sdc --init
 
@@ -47,13 +47,12 @@ msgAndWait "Copy the keyfile path to the clipboard."
 keyfilepath=$(wl-paste -n)
 msgAndWait "Is $keyfilepath correct? Stop the script if not."
 
-sudo parted /dev/sdb mklabel msdos
+sudo parted /dev/mmcblk0 mklabel msdos
 
 msgAndWait "About to do the burn."
 
-time $sudo /usr/local/bin/sdm --burn $dest --host citadel --plugin cryptroot:"crypto=aes|nopwd=y|keyfile=$keyfilepath" --expand-root --regen-ssh-host-keys --nowait-timesync $img --convert-root btrfs
+time $sudo /usr/local/bin/sdm --burn $dest --host citadel --plugin cryptroot:"crypto=aes|nopwd=y|keyfile=$keyfilepath" --expand-root --regen-ssh-host-keys --nowait-timesync $img
 
 echo ""
-echo "Ejecting /dev/sdb and /dev/sdc."
-$sudo eject /dev/sdb
+echo "Ejecting/dev/sdc."
 $sudo eject /dev/sdc
