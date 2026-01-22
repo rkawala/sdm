@@ -28,7 +28,7 @@ srcdir="$1"
 
 mkdir -p /usr/local/sdm/{1piboot,plugins,local-plugins}
 for f in sdm sdm-readparams sdm-apps-example sdm-apt sdm-apt-cacher sdm-cparse sdm-rpcsubs sdm-cryptconfig sdmcryptfs sdm-cportal sdm-customphase sdm-firstboot sdm-logms\
-g sdm-phase0 sdm-phase1 sdm-cmdsubs sdm-spawn bls-sdm-customize sdm-gburn sdm-make-luks-usb-key sdm-add-luks-key sdm-ssh-initramfs sdm-collect-labwc-config completion.sd\
+g sdm-phase0 sdm-phase1 sdm-cmdsubs sdm-spawn sdm-gburn sdm-make-luks-usb-key sdm-add-luks-key sdm-ssh-initramfs sdm-collect-labwc-config completion.sd\
 m sdm-yubi-config
 do
     copyif $srcdir/$f /usr/local/sdm
@@ -40,7 +40,7 @@ do
 done
 
 for f in apps apt-addrepo apt-cacher-ng apt-config apt-file bootconfig btwifiset chrony clockfake cloudinit cmdline copydir copyfile cryptroot \
-              disables docker-install dovecot-imap explore extractfs flight gadgetmode git-clone graphics hotspot imon knockd \
+              disables docker-install dovecot-imap explore extractfs gadgetmode git-clone graphics hotspot imon knockd \
               L10n labwc logwatch lxde mkdir modattr ndm network parted piapps pistrong postburn postfix quietness \
               raspiconfig runatboot runscript rxapp samba sdm-plugin-template serial sshd sshhostkey sshkey speedtest swap syncthing system trim-enable \
               ufw update-alternatives user venv vnc wificonfig wireguard wsdd sdm.phaseops
