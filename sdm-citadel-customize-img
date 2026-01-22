@@ -50,7 +50,7 @@ apps:name=mybrowsers|apps=firefox,chromium-browser
 apps:name=mytools|apps=keychain,lsof,iperf3,dnsutils
 
 # I took this list from andrewharle's gist. I omitted overlayroot.
-apps:name=coretools|apps=btrfs-progs,f2fs-tools,extrepo,git,apt-transport-https,nano,gpg,ca-certificates,apt-offline,f3,wl-clipboard
+apps:name=coretools|apps=btrfs-progs,f2fs-tools,extrepo,git,apt-transport-https,nano,gpg,ca-certificates,apt-offline,f3,wl-clipboard,lvm2
 apps:name=cryptoapps|apps=keepassxc
 apps:name=encryption-drivers|apps=cryptsetup,cryptsetup-initramfs,busybox,systemd-cryptsetup
 
@@ -67,7 +67,7 @@ disables:"piwiz|bluetooth"
 
 # Configure localization settings to the same as this system
 # https://github.com/gitbls/sdm/blob/master/Docs/Plugins.md#l10n
-L10n:host
+L10n:"keymap=us|locale=en_US.UTF-8|timezone=America/Los_Angeles|wificountry=US"
 
 EOF
     ) | bash -c "cat >>$assets/my.plugins"
@@ -79,6 +79,6 @@ mv ~/Downloads/$img .
 chmod 600 $img
 echo ""
 
-echo "--apt-dist-upgrade is not turned on, nor is --redact"
+echo "--redact is not turned on"
 
-time $sudo /usr/local/bin/sdm --customize $img --plugin @$assets/my.plugins --extend --xmb 512 --restart --regen-ssh-host-keys --showapt --aptcache localhost
+time $sudo /usr/local/bin/sdm --customize $img --plugin @$assets/my.plugins --extend --xmb 1024 --restart --regen-ssh-host-keys --apt-dist-upgrade --showapt --aptcache localhost
