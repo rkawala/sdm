@@ -25,7 +25,7 @@ img="$tmpDir/$1"
 dest="$2"
 [ "$dest" == "" ] && errexit "? No destination specified"
 
-msgAndWait "Insert the SD writer, then insert the USB key stick. Close dialog boxes when they pop up."
+msgAndWait "Insert the USB key stick. Close dialog boxes when they pop up."
 
 echo "Before umount"
 echo ""
@@ -37,7 +37,7 @@ echo ""
 lsblk
 
 echo ""
-msgAndWait "The SD writer should be /dev/mmcblk0. The USB key stick should be /dev/sdc. The MOUNTPOINTS column should be empty."
+msgAndWait "The SD card to be burned should be $dest. The USB key stick should be /dev/sdc. The MOUNTPOINTS column should be empty."
 
 $sudo /usr/local/sdm/sdm-make-luks-usb-key /dev/sdc --init
 
@@ -47,12 +47,18 @@ msgAndWait "Copy the keyfile path to the clipboard."
 keyfilepath=$(wl-paste -n)
 msgAndWait "Is $keyfilepath correct? Stop the script if not."
 
-sudo parted /dev/mmcblk0 mklabel msdos
+sudo parted $dest mklabel msdos
 
-msgAndWait "About to do the burn."
+# This command doesn't work because of an interaction between parted and btrfs. Maybe someday. I'm saving it for now.
+# cmd="$sudo /usr/local/bin/sdm --burn $dest --host citadel --plugin cryptroot:crypto=aes|nopwd=y|no-expand-root=y|keyfile=$keyfilepath --burn-plugin parted:rootexpand=4096|addpartition=0,btrfs --regen-ssh-host-keys --nowait-timesync --convert-root btrfs $img"
 
-time $sudo /usr/local/bin/sdm --burn $dest --host citadel --plugin cryptroot:"crypto=aes|nopwd=y|keyfile=$keyfilepath" --expand-root --regen-ssh-host-keys --nowait-timesync $img
+cmd="$sudo /usr/local/bin/sdm --burn $dest --host citadel --plugin cryptroot:crypto=aes|nopwd=y|keyfile=$keyfilepath --expand-root --regen-ssh-host-keys --nowait-timesync --convert-root btrfs $img"
+
+msgAndWait "About to do the burn: $cmd"
+time $cmd
 
 echo ""
-echo "Ejecting/dev/sdc."
+echo "Ejecting /dev/sdc."
 $sudo eject /dev/sdc
+echo "Ejecting $dest."
+$sudo eject $dest

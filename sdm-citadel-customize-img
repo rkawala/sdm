@@ -47,10 +47,10 @@ user:adduser=git|uid=1001|groups=git,users|nosudo
 
 # Install apps
 apps:name=mybrowsers|apps=firefox,chromium-browser
-apps:name=mytools|apps=keychain,lsof,iperf3,dnsutils
+apps:name=mytools|apps=keychain,lsof,iperf3,bind9-dnsutils
 
 # I took this list from andrewharle's gist. I omitted overlayroot.
-apps:name=coretools|apps=btrfs-progs,f2fs-tools,extrepo,git,apt-transport-https,nano,gpg,ca-certificates,apt-offline,f3,wl-clipboard,lvm2
+apps:name=coretools|apps=btrfs-progs,f2fs-tools,extrepo,git,apt-transport-https,nano,gpg,ca-certificates,apt-offline,f3,wl-clipboard,lvm2,apt-cacher-ng
 apps:name=cryptoapps|apps=keepassxc
 apps:name=encryption-drivers|apps=cryptsetup,cryptsetup-initramfs,busybox,systemd-cryptsetup
 
