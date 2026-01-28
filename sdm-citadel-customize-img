@@ -42,16 +42,16 @@ user:deluser=pi
 # Add citadel users.
 # I'm not sure if sdm generates the same /etc/group file that you get when you do a manual install.
 
-user:adduser=rkawala|password-hash=$user_pass|uid=1000|groups=rkawala,users,adm,dialout,audio,netdev,video,plugdev,cdrom,games,input,gpio,spi,i2c,render,sudo
+user:adduser=rkawala|password-hash=$user_pass|redact|uid=1000|groups=rkawala,users,adm,dialout,audio,netdev,video,plugdev,cdrom,games,input,gpio,spi,i2c,render,sudo
 user:adduser=git|uid=1001|groups=git,users|nosudo
 
 # Install apps
-apps:name=mybrowsers|apps=firefox,chromium-browser
+apps:name=mybrowsers|defer=firefox,chromium-browser
 apps:name=mytools|apps=keychain,lsof,iperf3,bind9-dnsutils
 
 # I took this list from andrewharle's gist. I omitted overlayroot.
-apps:name=coretools|apps=btrfs-progs,f2fs-tools,extrepo,git,apt-transport-https,nano,gpg,ca-certificates,apt-offline,f3,wl-clipboard,lvm2,apt-cacher-ng
-apps:name=cryptoapps|apps=keepassxc
+apps:name=coretools|apps=btrfs-progs,extrepo,git,apt-transport-https,nano,gpg,ca-certificates,apt-offline,wl-clipboard,apt-cacher-ng|defer=f2fs-tools,f3,systemd-container,whois
+apps:name=cryptoapps|defer=keepassxc
 apps:name=encryption-drivers|apps=cryptsetup,cryptsetup-initramfs,busybox,systemd-cryptsetup
 
 # Configure network manually once the image boots. SDM is capable of doing
@@ -79,6 +79,7 @@ mv ~/Downloads/$img .
 chmod 600 $img
 echo ""
 
+echo "--apt-dist-upgrade is not turned on"
 echo "--redact is not turned on"
 
-time $sudo /usr/local/bin/sdm --customize $img --plugin @$assets/my.plugins --extend --xmb 1024 --restart --regen-ssh-host-keys --apt-dist-upgrade --showapt --aptcache localhost
+time $sudo /usr/local/bin/sdm --customize $img --plugin @$assets/my.plugins --extend --xmb 1024 --restart --regen-ssh-host-keys --showapt --aptcache localhost
