@@ -43,10 +43,13 @@ user:deluser=pi
 # I'm not sure if sdm generates the same /etc/group file that you get when you do a manual install.
 
 user:adduser=rkawala|password-hash=$user_pass|redact|uid=1000|groups=rkawala,users,adm,dialout,audio,netdev,video,plugdev,cdrom,games,input,gpio,spi,i2c,render,sudo
-user:adduser=git|uid=1001|groups=git,users|nosudo
+user:adduser=git|password-hash=cannot-log-in-using-a-password|uid=1001|groups=git,users|nosudo
+
+# Remove apps I don't want
+apps:remove=vlc,rpi-connect,chromium-browser
 
 # Install apps
-apps:name=mybrowsers|defer=firefox,chromium-browser
+apps:name=mybrowsers|defer=firefox
 apps:name=mytools|apps=keychain,lsof,iperf3,bind9-dnsutils
 
 # I took this list from andrewharle's gist. I omitted overlayroot.
@@ -68,6 +71,9 @@ disables:"piwiz|bluetooth"
 # Configure localization settings to the same as this system
 # https://github.com/gitbls/sdm/blob/master/Docs/Plugins.md#l10n
 L10n:"keymap=us|locale=en_US.UTF-8|timezone=America/Los_Angeles|wificountry=US"
+
+# Make log files persistent
+system:"journal=persistent"
 
 EOF
     ) | bash -c "cat >>$assets/my.plugins"
