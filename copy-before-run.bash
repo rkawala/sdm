@@ -40,7 +40,7 @@ do
     copyif $srcdir/1piboot/$f /usr/local/sdm/1piboot
 done
 
-for f in apps apt-addrepo apt-cacher-ng apt-config apt-file bootconfig btwifiset chrony clockfake cloudinit cmdline copydir copyfile cryptroot \
+for f in apps apt-addrepo apt-cacher-ng apt-config apt-file bootconfig btwifiset chrony clockfake cloudinit cmdline copydir copyfile cryptpart cryptroot \
               disables docker-install dovecot-imap explore extractfs gadgetmode git-clone graphics hotspot imon knockd \
               L10n labwc logwatch lxde mkdir modattr ndm network parted piapps pistrong postburn postfix quietness \
               raspiconfig runatboot runscript rxapp samba sdm-plugin-template serial sshd sshhostkey sshkey speedtest swap syncthing system trim-enable \
