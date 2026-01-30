@@ -39,7 +39,9 @@ lsblk
 echo ""
 msgAndWait "The SD card to be burned should be $dest. The USB key stick should be /dev/sdc. The MOUNTPOINTS column should be empty."
 
-$sudo /usr/local/sdm/sdm-make-luks-usb-key /dev/sdc --init
+epoch_offset=$(date +%s)
+echo "Disk label is $epoch_offset"
+$sudo /usr/local/sdm/sdm-make-luks-usb-key /dev/sdc --init --mbr --fat --label $epoch_offset
 
 echo ""
 msgAndWait "Copy the keyfile path to the clipboard."
@@ -49,10 +51,10 @@ msgAndWait "Is $keyfilepath correct? Stop the script if not."
 
 sudo parted $dest mklabel msdos
 
-# This command doesn't work because of an interaction between parted and btrfs. Maybe someday. I'm saving it for now.
-# cmd="$sudo /usr/local/bin/sdm --burn $dest --host citadel --plugin cryptroot:crypto=aes|nopwd=y|no-expand-root=y|keyfile=$keyfilepath --burn-plugin parted:rootexpand=4096|addpartition=0,btrfs --regen-ssh-host-keys --nowait-timesync --convert-root btrfs $img"
+cmd="$sudo /usr/local/bin/sdm --burn $dest --host citadel --plugin cryptroot:crypto=aes|nopwd=y|no-expand-root=y|keyfile=$keyfilepath --burn-plugin parted:rootexpand=4096|addpartition=0,none --regen-ssh-host-keys --nowait-timesync --convert-root btrfs $img"
 
-cmd="$sudo /usr/local/bin/sdm --burn $dest --host citadel --plugin cryptroot:crypto=aes|nopwd=y|keyfile=$keyfilepath --expand-root --regen-ssh-host-keys --nowait-timesync --convert-root btrfs $img"
+# This version creates one big Btrfs partition on the SD card. Both the OS and my home dir are in the same partition.
+# cmd="$sudo /usr/local/bin/sdm --burn $dest --host citadel --plugin cryptroot:crypto=aes|nopwd=y|keyfile=$keyfilepath --expand-root --regen-ssh-host-keys --nowait-timesync --convert-root btrfs $img"
 
 msgAndWait "About to do the burn: $cmd"
 time $cmd

@@ -29,7 +29,8 @@ srcdir="$1"
 mkdir -p /usr/local/sdm/{1piboot,plugins,local-plugins}
 for f in sdm sdm-readparams sdm-apps-example sdm-apt sdm-apt-cacher sdm-cparse sdm-rpcsubs sdm-cryptconfig sdmcryptfs sdm-cportal sdm-customphase sdm-firstboot sdm-logms\
 g sdm-phase0 sdm-phase1 sdm-cmdsubs sdm-spawn sdm-gburn sdm-make-luks-usb-key sdm-add-luks-key sdm-ssh-initramfs sdm-collect-labwc-config completion.sd\
-m sdm-yubi-config
+m sdm-yubi-config \
+copy-before-run.bash sdm-citadel-*
 do
     copyif $srcdir/$f /usr/local/sdm
 done

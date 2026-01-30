@@ -1,0 +1,49 @@
+#!/bin/bash
+
+function errexit() {
+    echo -e "$1"
+    exit 1
+}
+
+function msgAndWait() {
+    local msg=$1
+
+    echo $msg
+    echo "Hit enter to continue."
+    read xxx
+}
+
+
+[ $EUID -eq 0 ] && sudo="" || sudo="sudo"
+
+usb_key_device="$1"
+[ "$usb_key_device" == "" ] && errexit "? No USB key device specified"
+
+usb_key_label="$2"
+[ "$usb_key_label" == "" ] && errexit "? No USB key label specified"
+
+lek_filename="$3"
+[ "$lek_filename" == "" ] && errexit "? No LEK filename specified"
+
+partition_to_pave="$4"
+[ "$partition_to_pave" == "" ] && errexit "? No to-pave partition specified"
+
+msgAndWait "Insert the USB key stick. Close dialog boxes when they pop up."
+
+dev_by_label=/dev/disk/by-label/$usb_key_label
+ls -al $dev_by_label
+if [ $(basename $usb_key_device) != $(basename $(readlink $dev_by_label)) ] then
+    errexit "Device and label don't match."
+fi
+
+msgAndWait "Does the device look good? Hit enter to continue."
+
+lek_path="/media/rkawala/$usb_key_label/$lek_filename"
+ls -al $lek_path
+if [ -n "$lek_path" ]; then
+    errexit "Couldn't find $lek_path"
+fi
+
+msgAndWait "Does the LEK file look good? Hit enter to continue."
+
+$sudo /usr/local/bin/sdm --runonly plugins --oklive --plugin cryptpart:"nopwd|cryptname=homepartition|fstype=btrfs|keyfile=$lek_path|mountpoint=/home.new|partname=$partition_to_pave|keyfile-location=usb|keydisk-id=LABEL=$usb_key_label"
