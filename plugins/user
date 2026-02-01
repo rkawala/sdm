@@ -160,7 +160,7 @@ function dosetpassword_user() {
 $user:$pswd
 EOF
     else
-	logtoboth "> Plugin $pfx: Update password for user '$user' with hashed password '$hashpswd'"
+	logtoboth "> Plugin $pfx: Update password for user '$user' with hashed password"
 	chpasswd -e <<EOF
 $user:$hashpswd
 EOF
@@ -468,7 +468,7 @@ pfx="$(basename $0)"     #For messages
 args="$2"
 vldargs="|addgroup|adduser|deluser|homedir|uid|password|nohomedir|noskel|nochown|Group|groupadd|groups|ugroups|prompt|rootpwd|setpassword|redact|nosudo|linger|samba|shell|smbpasswd|userlist|log"
 vldargs="${vldargs}|password-hash|password-plain|"
-redactargs="password|smbpasswd"
+redactargs="password|smbpasswd|password-hash|password-plain"
 loadparams
 assetdir="$SDMPT/etc/sdm/assets/user"
 [[ "$args" =~ "groups=" ]] && args="${args/groups=/ugroups=}"
