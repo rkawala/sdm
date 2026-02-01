@@ -42,7 +42,7 @@ user:deluser=pi
 # Add citadel users.
 # I'm not sure if sdm generates the same /etc/group file that you get when you do a manual install.
 
-user:adduser=rkawala|password-hash=$user_pass|redact|uid=1000|groups=rkawala,users,adm,dialout,audio,netdev,video,plugdev,cdrom,games,input,gpio,spi,i2c,render,sudo
+user:adduser=rkawala|password-hash=$user_pass|redact|uid=1000|groups=rkawala,users,adm,dialout,audio,netdev,video,plugdev,cdrom,games,input,gpio,spi,i2c,render,sudo,systemd-journal
 user:adduser=git|password-hash=cannot-log-in-using-a-password|uid=1001|groups=git,users|nosudo
 
 # Remove apps I don't want
