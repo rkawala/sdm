@@ -156,6 +156,7 @@ Usage: sudo sdm-make-luks-usb-key /dev/sdX [--switches]
 
 Switches (all are optional)
 * --fat                       If specified use a FAT32 partition; default is ext4
+* --force                     Overwrite the keydisk without checking and enables --init
 * --hidden                    If specified, create a GPT formatted disk and tag the partition as EFI
                                 Disk will not be readable on Windows. Requires --init
 * --hostname <hostname>       If specified, the file hostname.txt is updated with hostname and LUKS key UUID
@@ -231,6 +232,8 @@ if [ "$xkeyfile" != "" ]
 then
     [ -f $xkeyfile ] || errexit "? Keyfile '$xkeyfile' not found"
 fi
+
+[ $xforce -eq 1 ] && xinit=1
 
 mkdir -p /tmp/sdm
 
