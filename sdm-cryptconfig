@@ -7,6 +7,7 @@
 #
 
 function errexit() {
+    logifsdm "$1" noconsole
     echo -e "$1"
     exit 1
 }
