@@ -93,7 +93,7 @@ Use the apps plugin to install applications. The apps plugin can be called multi
 #### Arguments
 
 * **apps** &mdash; Specifies the list of apps to install or @filename to provide a list of apps (one per line) to install. Comments are indicated by a pound sign (#) and are ignored, so you can document your app list if desired. If the specified @filename is not found, sdm will look in the sdm directory (/usr/local/sdm). 
-* **defer** &mdash; Specifies the list of apps for which to defer install until after sdm FirstBoot has completed (and rebooted), speeding up the customization process.
+* **defer** &mdash; Specifies the list of apps for which to defer install until after sdm FirstBoot has completed (and rebooted), speeding up the customization process. Equivalent to using `--plugin defer-plugin:"apps=list,of,apps"`.
 * **name** &mdash; Specifies the name of the apps list. The default name is *default*. The `name` argument is a convenience and is not required.
 * **remove** &mdash; Specifies the list of apps to remove ofr @filename to provide a list of apps (one per line) to remove. The `remove` argument is processed before the `apps` argument. If you try to remove an apt packge that doesn't exist it will log in /etc/sdm/apt.log and sdm will notify you at the end of the customize: '? apt reported errors; review /etc/sdm/apt.log'
 
@@ -391,6 +391,31 @@ These are discussed further in the above-mentioned Disk Encryption page.
 #### Examples
 
 * `--plugin cryptroot:"authkeys=/home/bls/.ssh/authorized_keys|ssh` Configures the rootfs for encryption and enables SSH into the initramfs with keys authorized in the named authorized_keys file.
+
+### defer-plugin
+
+The `defer-plugin` is a bit different from other plugins. It takes a single argument, which is a plugin string. The specified plugin is run VERY late: After the system has fully booted. This means that sdm-cryptconfig has completed and rebooted the system, and there is no rootfs encryption in progress.
+
+This plugin is useful to accomplish tasks you want to complete on the newly-booted system that aren't needed immediately.
+
+For instance, the `apt-file` plugin installs apt-file and does an update. This is typically not needed initially when you first boot the system, and the update takes a bit of time. Use the `defer-plugin` to install `apt-file` later, which speeds up the customization process.
+
+The list of plugins that make sense to use with `defer-plugin` and have been tested: `apps`, `apt-file`, and `cryptpart`. The `apps` plugin `defer` argument and `defer-plugin:apps=<list>` are equivalent.
+
+#### Arguments
+
+This plugin has no defined argument names. See the examples.
+
+#### Examples
+
+* `--plugin defer-plugin:"apt-file"` &mdash; Run the `apt-file` plugin to install apt-file
+* `--plugin defer-plugin:"defer-plugin:vnc:tigervnc=2540x1350,1880x960,1700x1200,1880x1100"` &mdash; Install and configure tigervnc virtual desktops
+
+When used in a pluglist, the above two would be:
+```
+defer-plugin:apt-file
+defer-plugin:defer-plugin:vnc:tigervnc=2540x1350,1880x960,1700x1200,1880x1100
+```
 
 ### disables
 

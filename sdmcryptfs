@@ -375,10 +375,10 @@ function restore_rootfs() {
     #dd bs=4k count=$partsize if=$sdisk of=/dev/mapper/$cryptdevice
     if [ $xcompress -eq 0 ]
     then
-	echo "dd bs=16M if=/scratch/uncompressed-rootfs.img of=/dev/mapper/$cryptdevice"
+	#echo "dd bs=16M if=/scratch/uncompressed-rootfs.img of=/dev/mapper/$cryptdevice"
 	dd bs=16M if=/scratch/uncompressed-rootfs.img of=/dev/mapper/$cryptdevice
     else
-	echo "dd bs=16M if=/scratch/compressed-rootfs.lz4 | lz4 -d | bs=16M dd of=/dev/mapper/$cryptdevice"
+	#echo "dd bs=16M if=/scratch/compressed-rootfs.lz4 | lz4 -d | bs=16M dd of=/dev/mapper/$cryptdevice"
 	dd bs=16M if=/scratch/compressed-rootfs.lz4 | lz4 -d | dd bs=16M of=/dev/mapper/$cryptdevice
     fi
     pmsg "rootfs Restore elapsed time: $(datediff "$starttime" "$(getcbbdate)")"

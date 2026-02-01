@@ -68,7 +68,7 @@ then
     args="$2"
     loadparams
     vldargs="|ops|op|"
-    vops="|update-apt-cacher|apt-update|apt-upgrade|apt-autoremove|finish-customization|config-firstboot|graphics|pre-phase1|post-customization|shell|ssh|writeL10n|"
+    vops="|update-apt-cacher|apt-update|apt-upgrade|apt-autoremove|finish-customization|config-defer|config-firstboot|graphics|pre-phase1|post-customization|shell|ssh|writeL10n|"
     rqdargs=""
     assetdir="$SDMPT/etc/sdm/assets/$pfx"
 
@@ -164,6 +164,48 @@ EOF
 		    systemctl enable sdm-firstboot > /dev/null 2>&1
 		    [ "$hname" != "" ] && updatehostname $hname   # If hostname specified on customize then set it
 		    ;;
+		config-defer)
+		    #
+		    # Configure the deferred plugin service. Runs during the reboot after sdm-firstboot reboots the system
+		    #
+		    logtoboth "> Configure the deferred plugin service"
+		    cat > /etc/systemd/system/sdm-defer-pluglist.service <<EOF
+[Unit]
+ConditionPathExists=!/etc/sdm/control/sdm-startup
+ConditionPathExists=!/etc/sdm/control/rootfs-encryption
+ConditionPathExists=!/etc/sdm/control/no-defer-pluglist
+After=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/sdm-run-defer-pluglists
+TimeoutStopSec=300
+#ExecStop=/bin/rm /etc/systemd/system/sdm-do-apps-defers.service /usr/local/bin/sdm-do-apps-defers
+
+[Install]
+WantedBy=multi-user.target
+EOF
+		    systemctl -q enable sdm-defer-pluglist
+		    cat > /usr/local/bin/sdm-run-defer-pluglists <<'EOF'
+#!/bin/bash
+#
+# Process apps plugin deferred app installs
+#
+source /etc/sdm/sdm-readparams
+
+assetdir=/etc/sdm/assets/defer-pluglist
+
+if [ -f $assetdir/defer-pluglist ]
+then
+    logtoboth "* Start Run Defer Pluglists"
+    sdm --runonly plugins --oklive --logwidth 256 --plugin @$assetdir/defer-pluglist
+    logtoboth "* Complete Run Defer Pluglists"
+fi
+exit 0
+EOF
+		    chmod 755 /usr/local/bin/sdm-run-defer-pluglists
+		    ;;
 		graphics)
 		    #
 		    # Complete graphics post-install if graphics plugin not selected
@@ -183,7 +225,7 @@ EOF
 		    ;;
 		post-customization)
 		    logtoboth "> Run post-Customization steps"
-		    runoneplugin sdm.phaseops 1 "ops=config-firstboot,graphics,ssh,writeL10n,finish-customization"
+		    runoneplugin sdm.phaseops 1 "ops=config-defer,config-firstboot,graphics,ssh,writeL10n,finish-customization"
 		    ;;
 		#post-phase1)
 		    #logtoboth "> Run post-Phase1 steps"

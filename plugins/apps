@@ -5,57 +5,6 @@
 # The plugin is called three times: for Phase 0, Phase 1, and post-install.
 #
 
-function writedefersvc() {
-
-    if [ ! -f /etc/systemd/system/sdm-do-apps-defers.service ]
-    then
-	logtoboth "> Plugin $pfx: Create apps defer service"
-	cat > /etc/systemd/system/sdm-do-apps-defers.service <<EOF
-[Unit]
-ConditionPathExists=!/etc/sdm/control/sdm-startup
-ConditionPathExists=!/etc/sdm/control/rootfs-encryption
-ConditionPathExists=!/etc/sdm/control/no-defer-apps
-After=multi-user.target
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=/usr/local/bin/sdm-do-apps-defers
-TimeoutStopSec=300
-ExecStop=/bin/rm /etc/systemd/system/sdm-do-apps-defers.service /usr/local/bin/sdm-do-apps-defers
-
-[Install]
-WantedBy=multi-user.target
-EOF
-	systemctl -q enable sdm-do-apps-defers
-	cat > /usr/local/bin/sdm-do-apps-defers <<'EOF'
-#!/bin/bash
-#
-# Process apps plugin deferred app installs
-#
-source /etc/sdm/sdm-readparams
-
-assetdir=/etc/sdm/assets/apps
-sdatefmt="%Y-%m-%d-%H:%M:%S.%N"
-
-if compgen -G "$assetdir/*-defers" >/dev/null
-then
-    for fn in $assetdir/*-defers
-    do
-        name=$(basename $fn)
-        name=${name%-*}
-        read svapps < $fn
-        doinstalls "$svapps" "[$name] Application Installs"
-        fd=$(date -d "$(stat --printf "%y" $assetdir/$name-defers)" +$sdatefmt)
-        logtoboth "> Plugin apps: Save completed 'defers' list '$name-defers' as '$name-defers-$fd'"
-        mv $assetdir/$name-defers $assetdir/$name-defers-$fd
-    done
-fi
-EOF
-    chmod 755 /usr/local/bin/sdm-do-apps-defers
-    fi
-}
-
 function deferqemu() {
     [ -f $assetdir/qemu.user.static-defers ] || echo "qemu-user-static" > $assetdir/qemu.user.static-defers
 }
@@ -189,7 +138,19 @@ then
 	logtoboth "> Plugin $pfx: Save completed 'apps' list '$name' as '$name-$fd'"
 	mv $assetdir/$name $assetdir/$name-$fd
     fi
-    [ "$(compgen -G "$assetdir/*-defers" 2>/dev/null)" != "" ] && writedefersvc
+    if compgen -G "$assetdir/*-defers" >/dev/null
+    then
+	logtoboth "> Plugin $pfx: Queue deferred apps for defered processing"
+	for fn in $assetdir/*-defers
+	do
+            fname=$(basename $fn)
+            name=${fname%-*}
+            read svapps < $fn
+	    mkdir -p /etc/sdm/assets/defer-pluglist
+	    add_defer_plugin "apps:name=$name|apps=$svapps"
+	    mv $assetdir/$fname $assetdir/.$fname
+	done
+    fi
 
     logfreespace "at end of $pfx [$name] Phase 1"
     logtoboth "* Plugin $pfx: Complete Phase 1"

@@ -116,7 +116,7 @@ then
 		    [ "$value" != "" ] && logtoboth "> Plugin $pfx: Timezone '$value' will be set during sdm FirstBoot"
 		    ;;
 		wificountry)
-		    [ "$value" != "" ] && logtoboth "> Plugin $pfx: Wifi country '$value' will be set during sdm FirstBoot"
+		    [ "$value" != "" ] && logtoboth "> Plugin $pfx: WiFi country '$value' will be set during sdm FirstBoot"
 		    ;;
 	    esac
 	else
