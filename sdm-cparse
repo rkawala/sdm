@@ -843,6 +843,13 @@ function runplugins_exit() {
     runplugins "$plugins" $phase "$xargv" && return || exit
 }
 
+function add_defer_plugin() {
+    local plugin="$1"
+
+    mkdir -p $SDMPT/etc/sdm/assets/defer-pluglist
+    echo "$plugin" >> $SDMPT/etc/sdm/assets/defer-pluglist/defer-pluglist
+}
+
 function live0scripts() {
     #
     # Clear or run plugin boot scripts on the running system
@@ -986,7 +993,7 @@ function plugin_printkeys() {
 	    # The construct ${!c} gets the value of the variable 'pointed to' by contents of $c
 	    kn="${c//__/-}"
 	    kval="${!c}"
-	    [[ "$redactkeys" =~ "$c" ]] && [[ $fredact -eq 1 ]] && kval="REDACTED"
+	    [[ "$redactkeys" =~ "|$c|" ]] && [[ $fredact -eq 1 ]] && kval="REDACTED"
 	    $msgfn "   ${kn}: $kval"
 	done
     fi
