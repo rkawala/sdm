@@ -185,15 +185,18 @@ function checkdev() {
 function wipescratch() {
     local starttime partsize=$1
 
-    if askyn "Wipe scratch disk '$sdisk'"
+    if askyn "Securely wipe scratch disk '$sdisk'"
     then
 	pmsg "> Write random data on '$sdisk'"
 	starttime="$(getcbbdate)"
 	dd bs=4k count=$partsize if=/dev/random of=$sdisk
 	pmsg "rootfs Wipe elapsed time: $(datediff "$starttime" "$(getcbbdate)")"
     else
-	pmsg "> Scratch disk '$sdisk' has an unencrypted copy of rootfs"
-	pmsg "  Clean it up after rootfs encryption cleanup completes if that concerns you"
+	pmsg "> Zap partitions on scratch disk '$sdisk'"
+	sgdisk --zap-all $sdisk >/dev/null 2>&1
+	pmsg "> The partition table on '$disk' has been zapped"
+	pmsg "> Scratch disk '$sdisk' still has unencrypted blocks of rootfs on the disk"
+	pmsg "  Clean it up after rootfs encryption completes if that concerns you"
 	pmsg "  One way: sudo dd bs=4k count=$partsize if=/dev/random of=$sdisk"
     fi
 }
@@ -212,9 +215,9 @@ function save_rootfs() {
 	if [[ "$(tr -d '\0' < /sys/firmware/devicetree/base/compatible)" =~ raspberrypi ]]
 	then
             read junk mb junk < <(grep -i MemTotal /proc/meminfo)
-            rootfsize=$((((partsize/256)*3)/2))    # convert to MB and scale to 1.5X
+            rootfsize=$((((partsize/256)*6)/5))    # convert to MB and scale to 1.2X
             mb=$(((mb/1024)-2))            # Memory size in MB minus a bit
-            if [ $mb -gt $rootfsize ] ##&& [ "$(lsblk --noheadings -o RM $scpart)" == "" ]
+            if [ $mb -gt $rootfsize ]
             then
 		#pmsg "Use tmpfs |$rootfsize| |$mb| |$partsize|"
 		mount -t tmpfs -o size=${rootfsize}M tmpfs /scratch
