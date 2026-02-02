@@ -46,7 +46,7 @@ user:adduser=rkawala|password-hash=$user_pass|redact|uid=1000|groups=rkawala,use
 user:adduser=git|password-hash=cannot-log-in-using-a-password|uid=1001|groups=git,users|nosudo
 
 # Remove apps I don't want
-apps:remove=vlc,rpi-connect,chromium-browser
+apps:remove=vlc,rpi-connect,chromium
 
 # Install apps
 apps:name=mybrowsers|defer=firefox
