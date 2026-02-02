@@ -113,11 +113,11 @@ bootlog "Create and enable automatic disk encryption service"
 cat > /etc/systemd/system/sdm-auto-encrypt.service <<ZEOF
 [Unit]
 Description=sdm cryptroot automatic encryption
-After=multi-user.target
+After=multi-user.target network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStartPre=/bin/touch /etc/sdm/control/rootfs-encryption
 ExecStart=/usr/local/bin/sdm-cryptconfig --sdm $osw --reboot
 #ExecStart=/usr/local/bin/sdm-cryptconfig --sdm $osw
 
@@ -141,6 +141,8 @@ then
     logtoboth "* Plugin $pfx: Start Phase post-install"
     plugin_getargs $pfx "$args" "$vldargs" "$rqdargs"
     converty
+    logtoboth "> Plugin $pfx: set rootfs-encryption control flag"
+    /bin/touch /etc/sdm/control/rootfs-encryption
     used1k=$(getfsdf "/" used) 
     usedby=$((used1k*1024))
     logtoboth ""

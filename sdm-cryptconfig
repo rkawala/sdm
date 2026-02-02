@@ -917,7 +917,7 @@ do
 		echo ""
 		sleep 5
 	    fi
-	    apt install --no-install-recommends --yes $apps
+	    apt-get install --no-install-recommends --yes $apps
 	    ;;
 	config)
 	    # Save key values so they can be checked in sdm-cryptfs-cleanup
