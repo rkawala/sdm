@@ -50,7 +50,7 @@ apps:remove=vlc,rpi-connect,chromium-browser
 
 # Install apps
 apps:name=mybrowsers|defer=firefox
-apps:name=mytools|apps=keychain,lsof,iperf3,bind9-dnsutils
+apps:name=mytools|apps=keychain,lsof,iperf3,bind9-dnsutils,lz4
 
 # I took this list from andrewharle's gist. I omitted overlayroot.
 apps:name=coretools|apps=btrfs-progs,extrepo,git,apt-transport-https,nano,gpg,ca-certificates,apt-offline,wl-clipboard,apt-cacher-ng|defer=f2fs-tools,f3,systemd-container,whois
@@ -74,6 +74,9 @@ L10n:"keymap=us|locale=en_US.UTF-8|timezone=America/Los_Angeles|wificountry=US"
 
 # Make log files persistent
 system:"journal=persistent"
+
+# Set up my network
+network:"nmconf=/etc/NetworkManager/NetworkManager.conf|nmconn=/etc/NetworkManager/system-connections/TP-LINK_5Ghz_062869.nmconnection,/etc/NetworkManager/system-connections/TP-Link_5GHz_CF37E4.nmconnection"
 
 EOF
     ) | bash -c "cat >>$assets/my.plugins"
