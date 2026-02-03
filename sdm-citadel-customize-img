@@ -56,6 +56,8 @@ EOF
     ) | bash -c "cat >|$assets/my.plugins"
 
 # Note that variable substitution will take place in this heredoc: $user_pass needs it
+#
+# Also note the docs say that the user plugin must be the first plugin(s) that run.
 (cat <<EOF
 
 # Delete user pi if it exists
