@@ -8,6 +8,26 @@ function errexit() {
     exit 1
 }
 
+function msg_and_wait() {
+    local msg=$1
+
+    echo $msg
+    echo "Hit enter to continue."
+    read xxx
+}
+
+function ping_random() {
+    while true; do
+        host=www.$(tr -dc 'a-z' < /dev/urandom | fold -w 3 | head -n 1).com
+        echo "Testing IP and DNS with ping $host"
+        echo
+        ping -w 3 $host
+        if [ $? -eq 0 ]; then break; fi
+    done
+    echo
+    msg_and_wait "I think IP and DNS are working."
+}
+
 tmpDir=~/tmp/citadel-tmp
 mkdir -p $tmpDir
 cd $tmpDir
@@ -18,6 +38,8 @@ img="$1"
 [ "$img" == "" ] && errexit "? No IMG specified"
 
 [ "$(type -t sdm)" == "" ] && errexit "? sdm is not installed"
+
+ping_random
 
 read -sp "Enter rkawala password: " user_pass
 echo -e "\n**** REDACT THIS **** user_pass is $user_pass"
