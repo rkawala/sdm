@@ -84,7 +84,7 @@ apps:name=encryption-drivers|apps=cryptsetup,cryptsetup-initramfs,busybox,system
 
 # This configuration eliminates the need for piwiz so disable it
 # I don't use Bluetooth on my citadel, and it's a possible security problem, so disable it.
-disables:"piwiz|bluetooth"
+disables:"piwiz|bluetooth|cloudinit"
 
 # Uncomment to enable trim on all disks
 # https://github.com/gitbls/sdm/blob/master/Docs/Plugins.md#trim-enable
