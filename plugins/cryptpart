@@ -119,10 +119,11 @@ then
 	    if [ -v nonint ]
 	    then
 		printf "YES\n" | cryptsetup luksFormat --type luks2 $partname $kf
+		sts=$?
 	    else
 		cryptsetup luksFormat --type luks2 $partname $kf
+		sts=$?
 	    fi
-	    sts=$?
 	    [ $sts -eq 0 ] && break
 	    cpoptions $sts || logtobothex "? Plugin $pfx: Exit per user request"
 	done
@@ -133,10 +134,11 @@ then
 	    if [ -v nonint ]
 	    then
 		printf "$passphrase\n$passphrase\nYES\n" | cryptsetup luksFormat --type luks2 --cipher $cipher --hash sha256 --iter-time 5000 --key-size 256 --pbkdf argon2i $partname
+		sts=$?
 	    else
 		cryptsetup luksFormat --type luks2 --cipher $cipher --hash sha256 --iter-time 5000 --key-size 256 --pbkdf argon2i $partname
+		sts=$?
 	    fi
-	    sts=$?
 	    [ $sts -eq 0 ] && break
 	    cpoptions $sts || logtobothex "? Plugin $pfx: Exit per user request"
 	done
@@ -199,9 +201,10 @@ then
 	then
 	    mountname=${partname#/dev/}
 	    dirname="${mountname}Key"
-	    mountsvc="mnt-$dirname"
+	    mountsvc="tmp-$dirname"
 	    # create mount point
-	    mkdir -p /mnt/$dirname
+	    mkdir -p /tmp/$dirname
+	    logtoboth "> Plugin $pfx: Create systemd mount unit to automount the USB disk"
 	    # create systemd mount unit to mount the USB disk so the keyfile is available
 	    cat > /etc/systemd/system/$mountsvc.mount <<EOF
 [Unit]
@@ -211,7 +214,7 @@ Before=cryptsetup.target
 
 [Mount]
 What=$keydisk__id
-Where=/mnt/$dirname
+Where=/tmp/$dirname
 Options=ro
 
 [Install]
@@ -226,12 +229,12 @@ Requires=systemd-cryptsetup@$cryptname.service
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/umount /mnt/$dirname
+ExecStart=/usr/bin/umount /tmp/$dirname
 
 [Install]
 WantedBy=systemd-cryptsetup@$cryptname.service
 EOF
-	    kfloc="/mnt/$dirname/$kfn"
+	    kfloc="/tmp/$dirname/$kfn"
 	    opts="${opts},nofail,x-systemd.device-timeout=0"
 	fi
      fi
