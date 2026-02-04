@@ -101,6 +101,31 @@ function askyn() {
     esac
 }
 
+function ispkginstalled() {
+    #
+    # $1 has package name
+    #
+    iver=$(apt-cache policy $1 | grep Installed: 2> /dev/null)
+    if [ "$iver" == "" ]
+    then
+        return 1
+    else
+        [[ "$iver" =~ "(none)" ]] && return 1 || return 0
+    fi
+    return
+}
+
+function installpkgsif() {
+    local pkglist="$1" pkgs=() newpkgs="" p
+
+    IFS=" " read -a pkgs <<< $pkglist
+    for p in "${pkgs[@]}"
+    do
+	ispkginstalled $p && echo "  Package '$p' is already installed" || newpkgs="$newpkgs $p"
+    done
+    [ "$newpkgs" == "" ] || apt-get install --no-install-recommends --yes $newpkgs
+}
+
 function getphrase() {
     local pprompt="$1"
     local phrase phrase2 silent="-s" #silent=""
@@ -786,8 +811,8 @@ EOF
 }
 
 function domkinitramfs() {
-    echo "> Update initramfs with all the rootfs encryption settings in place"
-    logifsdm "Update initramfs with all the rootfs encryption settings in place"
+    #echo "> Update initramfs with all the rootfs encryption settings in place"
+    logifsdm "sdm-cryptconfig: Update initramfs with all the rootfs encryption settings in place"
     update-initramfs -u
 }
 
@@ -900,12 +925,12 @@ then
 	fi
     fi
 fi
-logifsdm "Starting; System will restart automatically when complete"
+logifsdm "sdm-cryptconfig Starting; System will restart automatically when complete"
 
-for o in doapt config mkinitramfs updateboot
+for o in doapt-installs config mkinitramfs updateboot
 do
     case "$o" in
-	doapt)
+	doapt-installs)
 	    [ $xssh -eq 1 ] && db="dropbear-initramfs dropbear-bin" || db=""
 	    apps="cryptsetup cryptsetup-initramfs cryptsetup-bin lz4 gdisk e2fsprogs $db"
 	    echo "> Install $apps"
@@ -917,7 +942,7 @@ do
 		echo ""
 		sleep 5
 	    fi
-	    apt-get install --no-install-recommends --yes $apps
+	    installpkgsif $apps
 	    ;;
 	config)
 	    # Save key values so they can be checked in sdm-cryptfs-cleanup
