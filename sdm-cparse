@@ -1034,6 +1034,34 @@ function plugin_addnote() {
     echo "Plugin $pfx: $msg" >> $SDMPT/etc/sdm/rnotes
 }
 
+function add_redaction() {
+    #
+    # Add string in $1 to the redaction file. Dollar signs must already be redacted. See do_redactions
+    #
+    local pswd="$1"
+
+    printf "${pswd}\n" >> $SDMPT/etc/sdm/assets/redact-passwords
+}
+
+function do_redactions() {
+    local pswd
+    if [ -f $SDMPT/etc/sdm/assets/redact-passwords ]
+    then
+        logtoboth "> Redact passwords in /etc/sdm/cparams and /etc/sdm/history"
+        while read pswd
+        do
+	    #pswd="${pswd//$/\\$}"    # Escape $. Done by caller of add_redaction
+	    pswd="${pswd//\//\\/}"   # Escape /
+            sed -i "s/$pswd/REDACTED/" $SDMPT/etc/sdm/cparams
+            sed -i "s/$pswd/REDACTED/" $SDMPT/etc/sdm/history
+        done < $SDMPT/etc/sdm/assets/redact-passwords
+    else
+        logtoboth "% No saved passwords found to redact"
+    fi
+    logtoboth "> Remove redacted password list and all userlists in $SDMPT/etc/sdm/assets/user/userlist-*"
+    rm -f $SDMPT/etc/sdm/assets/redact-passwords $SDMPT/etc/sdm/assets/user/userlist-*
+}
+
 function printnotes() {
 
     if [ -f $SDMPT/etc/sdm/rnotes ]
@@ -1885,15 +1913,15 @@ function notmounted() {
 }
 
 function getmtpt() {
-    if ! ismounted /mnt/sdm
+    if ! ismounted /tmp/sdm
     then
-	echo "/mnt/sdm"
+	echo "/tmp/sdm"
     else
-	if ismounted /mnt/sdm.${BASHPID}
+	if ismounted /tmp/sdm.${BASHPID}
 	then
-	    errexit "? Alternate mount point /mnt/sdm.${BASHPID} in use"
+	    errexit "? Alternate mount point /tmp/sdm.${BASHPID} in use"
 	fi
-	echo "/mnt/sdm.${BASHPID}"
+	echo "/tmp/sdm.${BASHPID}"
     fi
 }
 
@@ -1904,15 +1932,15 @@ function makemtpt() {
 }
 
 function getmtptX() {
-    if ! ismounted /mnt/sdmX
+    if ! ismounted /tmp/sdmX
     then
-	echo "/mnt/sdmX"
+	echo "/tmp/sdmX"
     else
-	if ismounted /mnt/sdmX.${BASHPID}
+	if ismounted /tmp/sdmX.${BASHPID}
 	then
-	    errexit "? Alternate mount point /mnt/sdmX.${BASHPID} in use"
+	    errexit "? Alternate mount point /tmp/sdmX.${BASHPID} in use"
 	fi
-	echo "/mnt/sdmX.${BASHPID}"
+	echo "/tmp/sdmX.${BASHPID}"
     fi
 }
 
@@ -2066,7 +2094,7 @@ function docleanup() {
     zfsp="$(type -p zfs)"
     zfsmpt="$(zfs list -o mountpoint -H rpool/ROOT/debian 2>/dev/null)"
 
-    for mnt in "${SDMPT:-/mnt/sdm}" "$SDMPX"
+    for mnt in "${SDMPT:-/tmp/sdm}" "$SDMPX"
     do
 	if [ "$mnt" != "" ]
 	then
@@ -2093,7 +2121,7 @@ function docleanup() {
     then
 	if [ "$SDMPT" != "" ]
 	then
-	    [ "$SDMPT" != "/mnt/sdm" ] && rm -rf $SDMPT
+	    [ "$SDMPT" != "/tmp/sdm" ] && rm -rf $SDMPT
 	    unset SDMPT
 	fi
 	[ "$SDMPX" != "" ] && rm -rf $SDMPX
