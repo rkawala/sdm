@@ -159,7 +159,7 @@ function copybypart() {
     partprobe #>/dev/null 2>&1
     if [ "$dsttype" == "dos" ]
     then
-	write_burnmsg "* Create MBR partitions on $dstdev"
+	write_burnmsg "* Create MBR partition table on $dstdev"
 	echo "label:$dsttype" | sfdisk --force $dstdev >/dev/null 2>&1
 	errifrc $? "? Error creating label on $dstdev"
 	parted -s $dstdev mkpart primary fat32 ${fatstart} ${fatend}
@@ -169,7 +169,7 @@ function copybypart() {
 	write_burnmsg "> Set new disk ID '$newdiskid' on '$burndev'"
 	setdiskid $dstdev $newdiskid
     else
-	write_burnmsg "> Create GPT partitions on $dstdev"
+	write_burnmsg "> Create GPT partition table on $dstdev"
 	parted -s $dstdev mklabel gpt
 	errifrc $? "? Error creating label on $dstdev"
 	sgdisk --new 1:$fatstart:$fatend $dstdev >/dev/null
@@ -632,7 +632,8 @@ EOF
 	if [[ $bfredact -eq 1 ]]
 	then
 	    write_burnmsg "> Redact passwords from /etc/sdm/cparams and /etc/sdm/history"
-	    runoneplugin user redact "redact"
+	    do_redactions
+	    #runoneplugin user redact "redact"
 	fi
 
 	declare -x SDMNSPAWN="Burn0"
