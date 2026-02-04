@@ -206,6 +206,7 @@ EOF
 [Unit]
 Description=sdm Speedtest monitor
 After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
