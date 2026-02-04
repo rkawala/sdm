@@ -5,12 +5,24 @@ function errexit() {
     exit 1
 }
 
-function msgAndWait() {
+function msg_and_wait() {
     local msg=$1
 
     echo $msg
     echo "Hit enter to continue."
     read xxx
+}
+
+function ping_random() {
+    while true; do
+        host=www.$(tr -dc 'a-z' < /dev/urandom | fold -w 3 | head -n 1).com
+        echo "Testing IP and DNS with ping $host"
+        echo
+        ping -w 3 $host
+        if [ $? -eq 0 ]; then break; fi
+    done
+    echo
+    msg_and_wait "I think IP and DNS are working."
 }
 
 tmpDir=~/tmp/citadel-tmp
@@ -25,7 +37,10 @@ img="$tmpDir/$1"
 dest="$2"
 [ "$dest" == "" ] && errexit "? No destination specified"
 
-msgAndWait "Insert the USB key stick. Close dialog boxes when they pop up."
+ping_random
+
+msg_and_wait "Insert a blank SD card in the USB burner. Plug in the burner. Close dialog boxes when they pop up."
+msg_and_wait "Plug in a blank USB key stick. Close dialog boxes when they pop up."
 
 echo "Before umount"
 echo ""
@@ -37,26 +52,29 @@ echo ""
 lsblk
 
 echo ""
-msgAndWait "The SD card to be burned should be $dest. The USB key stick should be /dev/sdc. The MOUNTPOINTS column should be empty."
+msg_and_wait "The SD card to be burned should be $dest. The USB key stick should be /dev/sdc. The MOUNTPOINTS column should be empty."
 
 epoch_offset=$(date +%s)
 echo "Disk label is $epoch_offset"
-$sudo /usr/local/sdm/sdm-make-luks-usb-key /dev/sdc --init --mbr --fat --label $epoch_offset
+echo
+
+key_output_tmp=/tmp/$$sdm-burn
+touch $key_output_tmp
+$sudo /usr/local/sdm/sdm-make-luks-usb-key /dev/sdc --init --mbr --fat --label $epoch_offset 2>&1 | tee $key_output_tmp
 
 echo ""
-msgAndWait "Copy the keyfile path to the clipboard."
 
-keyfilepath=$(wl-paste -n)
-msgAndWait "Is $keyfilepath correct? Stop the script if not."
+keyfilepath=$(grep "For sdm-cryptconfig use" $key_output_tmp | cut -d ' ' -f 8)
+msg_and_wait "Is $keyfilepath correct? Stop the script if not."
 
 sudo parted $dest mklabel msdos
 
-cmd="$sudo /usr/local/bin/sdm --burn $dest --host citadel --plugin cryptroot:crypto=aes|nopwd=y|no-expand-root=y|keyfile=$keyfilepath --burn-plugin parted:rootexpand=4096|addpartition=0,none --regen-ssh-host-keys --nowait-timesync --convert-root btrfs $img"
+cmd="$sudo /usr/local/bin/sdm --burn $dest --host citadel --plugin copyfile:from=$keyfilepath|to=/delete-me|mkdirif --plugin cryptroot:crypto=aes|nopwd=y|keyfile=$keyfilepath --burn-plugin parted:rootexpand=4096|addpartition=0,none --plugin defer-plugin:cryptpart:nopwd|cryptname=homepartition|fstype=btrfs|keyfile=/delete-me/$(basename $keyfilepath)|mountpoint=/home|partname=/dev/mmcblk0p3|keyfile-location=usb|keydisk-id=LABEL=$epoch_offset|nonint --convert-root btrfs $img"
 
 # This version creates one big Btrfs partition on the SD card. Both the OS and my home dir are in the same partition.
 # cmd="$sudo /usr/local/bin/sdm --burn $dest --host citadel --plugin cryptroot:crypto=aes|nopwd=y|keyfile=$keyfilepath --expand-root --regen-ssh-host-keys --nowait-timesync --convert-root btrfs $img"
 
-msgAndWait "About to do the burn: $cmd"
+msg_and_wait "About to do the burn: $cmd"
 time $cmd
 
 echo ""
