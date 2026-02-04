@@ -3,34 +3,9 @@
 # I started with ezsdm, then I made customizations from the gist at
 # https://gist.github.com/andrewharle/0a0558a7438e6967f10c6e7b21efb7bd
 
-function errexit() {
-    echo -e "$1"
-    exit 1
-}
+. sdm-citadel-cmdsubs
 
-function msg_and_wait() {
-    local msg=$1
-
-    echo $msg
-    echo "Hit enter to continue."
-    read xxx
-}
-
-function ping_random() {
-    while true; do
-        host=www.$(tr -dc 'a-z' < /dev/urandom | fold -w 3 | head -n 1).com
-        echo "Testing IP and DNS with ping $host"
-        echo
-        ping -w 3 $host
-        if [ $? -eq 0 ]; then break; fi
-    done
-    echo
-    msg_and_wait "I think IP and DNS are working."
-}
-
-tmpDir=~/tmp/citadel-tmp
-mkdir -p $tmpDir
-cd $tmpDir
+make_my_citadel_tmpdir
 
 [ $EUID -eq 0 ] && sudo="" || sudo="sudo"
 
