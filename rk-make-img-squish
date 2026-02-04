@@ -1,0 +1,47 @@
+#!/bin/bash
+
+. sdm-citadel-cmdsubs
+
+make_my_citadel_tmpdir
+
+[ $EUID -eq 0 ] && sudo="" || sudo="sudo"
+
+img="$1"
+
+[ "$img" == "" ] && errexit "? No IMG specified"
+
+lower=$img.squashfs
+lower_dir=$lower.tmp
+lower_mount=$lower.mountpoint
+upper_dir=$img.upper
+work_dir=$img.work
+overlay_mount=$img.mountpoint
+
+if [ \! -f $lower ]; then
+    echo "$lower doesn't exist. Creating it."
+    rm -f $img $lower_dir $lower_mount
+    mkdir $lower_dir
+    echo "Extracting $img"
+    time unxz -k ~/Downloads/$img.xz
+    mv ~/Downloads/$img $lower_dir
+    chmod 600 $lower_dir/$img
+    time mksquashfs $lower_dir $lower -comp xz
+    # Delete the dir once things work
+    #rm -fr $lower_dir
+fi
+
+mkdir -p $lower_mount
+$sudo mount --type=squashfs --options=loop --source=$lower --target=$lower_mount
+
+echo "Looking at the image file inside the mounted SquashFS at $lower_mount"
+ls -al $lower_mount
+
+mkdir -p $upper_dir $work_dir $overlay_mount
+$sudo mount --type=overlay --options="lowerdir=$lower_mount,upperdir=$upper_dir,workdir=$work_dir" --source=overlay --target=$overlay_mount
+
+echo
+echo "Looking at the image file inside the mounted overlay filesystemi at $overlay_mount"
+ls -al $overlay_mount
+
+echo
+echo "The argument you'll use for sdm-citadel-customize-img is $overlay_mount/$img"
