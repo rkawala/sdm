@@ -174,14 +174,14 @@ EOF
 ConditionPathExists=!/etc/sdm/control/sdm-startup
 ConditionPathExists=!/etc/sdm/control/rootfs-encryption
 ConditionPathExists=!/etc/sdm/control/no-defer-pluglist
-After=multi-user.target
+After=multi-user.target network-online.target
+Wants=network-online.target
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/local/bin/sdm-run-defer-pluglists
 TimeoutStopSec=300
-#ExecStop=/bin/rm /etc/systemd/system/sdm-do-apps-defers.service /usr/local/bin/sdm-do-apps-defers
 
 [Install]
 WantedBy=multi-user.target
@@ -202,6 +202,9 @@ then
     sdm --runonly plugins --oklive --logwidth 256 --plugin @$assetdir/defer-pluglist
     logtoboth "* Complete Run Defer Pluglists"
 fi
+logtoboth "* Dot-hide /etc/systemd/system/sdm-defer-pluglist.service and /usr/local/bin/sdm-run-defer-pluglists"
+mv /etc/systemd/system/sdm-defer-pluglist.service /etc/systemd/system/.sdm-defer-pluglist.service
+mv /usr/local/bin/sdm-run-defer-pluglists /usr/local/bin/.sdm-run-defer-pluglists
 exit 0
 EOF
 		    chmod 755 /usr/local/bin/sdm-run-defer-pluglists
