@@ -57,23 +57,6 @@ function getpassword() {
     printf -v userpwd "%s" "$pwd"
 }
 
-function redact_passwords() {
-    local pswd
-    if [ -f $assetdir/redact-passwords ]
-    then
-	logtoboth "> Plugin $pfx: Redact passwords in /etc/sdm/cparams and /etc/sdm/history"
-	while read pswd
-	do
-	    sed -i "s/$pswd/REDACTED/" $SDMPT/etc/sdm/cparams
-	    sed -i "s/$pswd/REDACTED/" $SDMPT/etc/sdm/history
-	done < $assetdir/redact-passwords
-    else
-	logtoboth "% Plugin $pfx: No saved passwords found to redact"
-    fi
-    logtoboth "> Plugin $pfx: Redact any userlists in $assetdir"
-    rm -f $assetdir/redact-passwords $assetdir/userlist-*
-}
-
 function loguseraction() {
     # Must be in Phase 0
     local action="$1" user="$2" pswd="$3" prompt="$4" homedir="$5" uid="$6" nohomedir="$7" agroups="$8" nosudo="$9" samba="${10}" smbpasswd="${11}" noskel="${12}" nochown="${13}" pgroup="${14}" shell="${15}" groupadd="${16}" rootpwd="${17}" hashpswd="${18}"
@@ -184,7 +167,8 @@ function setpassword_user() {
 		fi
 	    fi
 	fi
-	printf "${pswd}\n" >> $assetdir/redact-passwords  # Save for redaction
+	add_redaction "${pswd//$/\\$}"
+	add_redaction "${hashpswd//$/\\$}"
 	dosetpassword_user "$user" "$pswd" "$hashpswd"
     else
 	logtobothex "? Plugin $pfx: User '$user' not found for setpassword"
@@ -311,8 +295,8 @@ function add_user() {
 	if [[ "$pswd" != "" ]] || [[ "$hashpswd" != "" ]]
 	then
 	    logtoboth "> Plugin $pfx: Set password for user '$user'"
-	    [ "$pswd" != "" ] && printf "${pswd}\n" >> $assetdir/redact-passwords  # Save for redaction
-	    [ "$hashpswd" != "" ] && printf "${hashpswd}\n" >> $assetdir/redact-passwords  # Save for redaction
+	    [ "$pswd" != "" ] && add_redaction "${pswd//$/\\$}"
+	    [ "$hashpswd" != "" ] && add_redaction "${hashpswd//$/\\$}"
 	    dosetpassword_user "$user" "$pswd" "$hashpswd"
 	fi
     fi
@@ -548,7 +532,7 @@ case "$phase" in
 	fi
 	if [ $fredact -eq 1 -o "$redact" != "" ]
 	then
-	    redact_passwords
+	    do_redactions
 	fi
 	logtoboth "* Plugin $pfx: Complete Phase post-install"
 	;;
@@ -559,7 +543,7 @@ case "$phase" in
 
 	if [ $fredact -eq 1 -o "$redact" != "" ]
 	then
-	    redact_passwords
+	    do_redactions
 	fi
 	;;
     *)
