@@ -43,6 +43,7 @@ then
     then
 	logtobothex "? Plugin $pfx: One of 'apps', 'defer', or 'remove' must be specified"
     fi
+    [ "$defer" != "" ] && [[ "$SDMNSPAWN" =~ Live ]] && logtobothex "? Plugin $pfx: 'defer' option invalid on live system"
     [ "$name" == "" ] && name="default"
     if [ "$apps" != "" ]
     then
