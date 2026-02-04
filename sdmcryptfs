@@ -28,7 +28,7 @@ function thisdate() {
 
 function pmsg() {
     local msg="$1"
-    echo "> $(thisdate) $msg" >/dev/console
+    echo "> $(thisdate) $msg" ###>/dev/console
 }
 
 function askyn() {
@@ -52,6 +52,19 @@ function getcbbdate() {
    echo $(date "$cdtfmt")
 }
 
+function printdt() {
+    #
+    # Computes time from seconds ($1) and returns it as a string of Days:Hours:Minutes:Seconds
+    #
+    local days hours minutes seconds eseconds="$1"
+    local btime="$1" etime="$2"
+    days=$((eseconds/86400))
+    hours=$(((eseconds - $((days*86400)))/3600))
+    minutes=$(((eseconds - $((days*86400)) - $((hours*3600)))/60))
+    seconds=$((eseconds - $((days*86400)) - $((hours*3600)) - $((minutes*60))))
+    [ $days -ne 0 ] && printf "%02d:%02d:%02d:%02d\n" "$days" "$hours" "$minutes" "$seconds" || printf "%02d:%02d:%02d\n" "$hours" "$minutes" "$seconds"
+}
+ 
 function datediff() {
     #
     # Computes difference between two dates
@@ -60,11 +73,7 @@ function datediff() {
     local days hours minutes seconds eseconds
     local btime="$1" etime="$2"
     eseconds=$(($(/bin/date -d "$etime" +%s) - $(/bin/date -d "$btime" +%s)))
-    days=$((eseconds/86400))
-    hours=$(((eseconds - $((days*86400)))/3600))
-    minutes=$(((eseconds - $((days*86400)) - $((hours*3600)))/60))
-    seconds=$((eseconds - $((days*86400)) - $((hours*3600)) - $((minutes*60))))
-    [ $days -ne 0 ] && printf "%02d:%02d:%02d:%02d\n" "$days" "$hours" "$minutes" "$seconds" || printf "%02d:%02d:%02d\n" "$hours" "$minutes" "$seconds"
+    printdt "$eseconds"
 }
 
 function getgbstr() {
@@ -84,7 +93,7 @@ function getgbstr() {
 
 function ispdevp() {
     local dev="$1"
-    [[ "$dev" =~ "mmcblk" ]] || [[ "$dev" =~ "nvme0n1" ]] && return 0 || return 1
+    [[ "$dev" =~ "mmcblk" ]] || [[ "$dev" =~ "nvme" ]] && return 0 || return 1
 }
 
 function isgpt() {
@@ -210,6 +219,8 @@ function save_rootfs() {
     local starttime endtime pbytes pgb
 
     mkdir -p /scratch
+    pmsg "** NOTE: save and restore time estimates are pessimistic"
+    pmsg "** Exact speed measurements dependent on CPU, memory, and disk speeds of this system"
     if [ -f /sys/firmware/devicetree/base/compatible ]
     then
 	if [[ "$(tr -d '\0' < /sys/firmware/devicetree/base/compatible)" =~ raspberrypi ]]
@@ -219,9 +230,9 @@ function save_rootfs() {
             mb=$(((mb/1024)-2))            # Memory size in MB minus a bit
             if [ $mb -gt $rootfsize ]
             then
-		#pmsg "Use tmpfs |$rootfsize| |$mb| |$partsize|"
 		mount -t tmpfs -o size=${rootfsize}M tmpfs /scratch
 		pmsg "Save rootfs '$rootfs' to RAM disk"
+		pmsg "rootfs save should take approximately $(printdt $(((partsize/256)/43)))"
 		xcompress=0
 	    fi
 	fi
@@ -237,11 +248,9 @@ function save_rootfs() {
 	mke2fs -F $scpart >/dev/null || exit 1
 	mount $scpart /scratch
 	pmsg "Save rootfs '$rootfs' to '$sdisk'"
+	pmsg "rootfs save should take approximately $(printdt $(((partsize/256)/51)))"
     fi
-    pgb=$((partsize/262144))
-    pmsg "rootfs save should take less than $pgb minutes"
     starttime="$(getcbbdate)"
-    #dd bs=4k count=$partsize if=$rootfs of=$sdisk
     if [ $xcompress -eq 0 ]
     then
 	# no compression
@@ -250,10 +259,11 @@ function save_rootfs() {
 	# use compression
 	fullblocks=$((partsize/4096))   #1M blocks
 	remainder=$((partsize % 4096))  #   remainder bits
-	#pmsg "D fullblocks:|$fullblocks| remainder:|$remainder|"
+	pmsg "Compress and save $fullblocks 16MB blocks"
 	dd bs=16M count=$fullblocks if=$rootfs | lz4 -c --fast=1 > /scratch/compressed-rootfs.lz4
 	if [ $remainder -ne 0 ]
 	then
+	    pmsg "Compress and save $remainder 4K blocks"
 	    dd bs=4k if=$rootfs skip=$((fullblocks*4096)) count=$remainder | lz4 -c --fast=1 >> /scratch/compressed-rootfs.lz4
 	fi
     fi
@@ -372,15 +382,14 @@ function restore_rootfs() {
     local starttime endtime pbytes pgb
     checkdev $sdisk || return 1
     pmsg "Restore '$rootfs' from '$sdisk'"
-    pgb=$((partsize/262144))
-    pmsg "rootfs restore should take less than $pgb minutes"
     starttime="$(getcbbdate)"
-    #dd bs=4k count=$partsize if=$sdisk of=/dev/mapper/$cryptdevice
     if [ $xcompress -eq 0 ]
     then
+	pmsg "rootfs restore should take approximately $(printdt $(((partsize/256)/15)))"
 	#echo "dd bs=16M if=/scratch/uncompressed-rootfs.img of=/dev/mapper/$cryptdevice"
 	dd bs=16M if=/scratch/uncompressed-rootfs.img of=/dev/mapper/$cryptdevice
     else
+	pmsg "rootfs restore should take approximately $(printdt $(((partsize/256)/11)))"
 	#echo "dd bs=16M if=/scratch/compressed-rootfs.lz4 | lz4 -d | bs=16M dd of=/dev/mapper/$cryptdevice"
 	dd bs=16M if=/scratch/compressed-rootfs.lz4 | lz4 -d | dd bs=16M of=/dev/mapper/$cryptdevice
     fi
@@ -455,7 +464,12 @@ function runall() {
 fdebug=1
 dev="$1"
 sdisk="$2"
+datefmt="%Y-%m-%d %H:%M:%S"
 [[ "$dev" == "" ]] || [[ "$sdisk" == "" ]] && usage
+
+[ -e /sys/firmware/devicetree/base/model ] && pimodel=$(tr -d '\0' < /sys/firmware/devicetree/base/model) || pimodel=""
+IFS=" " read ign pimem units <<< $(grep -i MemTotal /proc/meminfo)
+[ "$pimodel" != "" ] && [ "$pimem" != "" ] && pmsg "Start sdmcryptfs on a $pimem $units '$pimodel'"
 
 xcrypto=""
 IFS=":" read lval xcrypto < <(grep xcrypto: /etc/sdmcryptctl)
@@ -469,10 +483,9 @@ IFS=":" read lval xcompress < <(grep xcompress: /etc/sdmcryptctl)
 [ "$xcompress" == "" ] && xcompress=1
 
 partsize=""
-datefmt="%Y-%m-%d %H:%M:%S"
 IFS=":" read lval cryptdevice < <(grep mappername: /etc/sdmcryptctl)
 [ "$cryptdevice" == "" ] && cryptdevice="nomappername"
-runall $dev $sdisk 
+runall $dev $sdisk || exit 1
 wipescratch $partsize
 
 sleepsecs=10
