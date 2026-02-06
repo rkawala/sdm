@@ -2,6 +2,7 @@
 
 function copyif() {
     local fl=$1 od=$2
+    echo "Checking $fl"
     if [ -f $fl ]
     then
         odfl="$od/$(basename $fl)"
@@ -30,7 +31,7 @@ mkdir -p /usr/local/sdm/{1piboot,plugins,local-plugins}
 for f in sdm sdm-readparams sdm-apps-example sdm-apt sdm-apt-cacher sdm-cparse sdm-rpcsubs sdm-cryptconfig sdmcryptfs sdm-cportal sdm-customphase sdm-firstboot sdm-logms\
 g sdm-phase0 sdm-phase1 sdm-cmdsubs sdm-spawn sdm-gburn sdm-make-luks-usb-key sdm-add-luks-key sdm-ssh-initramfs sdm-collect-labwc-config completion.sd\
 m sdm-yubi-config \
-copy-before-run.bash sdm-citadel-*
+copy-before-run.bash sdm-citadel-* rk-*
 do
     copyif $srcdir/$f /usr/local/sdm
 done
