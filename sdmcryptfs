@@ -203,7 +203,7 @@ function wipescratch() {
     else
 	pmsg "> Zap partitions on scratch disk '$sdisk'"
 	sgdisk --zap-all $sdisk >/dev/null 2>&1
-	pmsg "> The partition table on '$disk' has been zapped"
+	pmsg "> The partition table on '$sdisk' has been zapped"
 	pmsg "> Scratch disk '$sdisk' still has unencrypted blocks of rootfs on the disk"
 	pmsg "  Clean it up after rootfs encryption completes if that concerns you"
 	pmsg "  One way: sudo dd bs=4k count=$partsize if=/dev/random of=$sdisk"
