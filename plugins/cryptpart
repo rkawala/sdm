@@ -160,7 +160,7 @@ then
 	logtoboth "> Plugin $pfx: Open encrypted partition '$partname' with passphrase"
 	while [ 0 ]
 	do
-	    cryptsetup luksOpen $partname $cryptname
+	    printf "$passphrase\n" | cryptsetup luksOpen $partname $cryptname
 	    [ $? -eq 0 ] && break
 	done
     fi
