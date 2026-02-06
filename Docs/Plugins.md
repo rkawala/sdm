@@ -352,7 +352,7 @@ Encrypts an already-created partition. The partition must not be the rootfs, and
 * **mountpoint** &mdash; /path/to/directory for the partition mount point. If not specified, it will not be configured
 * **nonint** &mdash; Perform the encryption non-interactive. Requires `keyfile` or `passphrase`
 * **nopwd** &mdash; Do not add an unlock passphrase. Requires `keyfile`
-* **partname** &mdash; Partition to encrypt [/dev/sdXn, e.g., /dev/sda3]. Required
+* **partname** &mdash; Partition to encrypt [/dev/sdXn, e.g., /dev/sda3]. Required. See <a href="Disk-Encryption.md#encrypting-other-partitions">Encrypting Other Partitions</a> for details.
 * **passphrase** &mdash; Unlock passphrase. Must be specified if `nonint` and no keyfile provided.
 
 `cryptname`, `fstype`, and `partname` arguments are required. if `nonint` is specified, one of `keyfile` or `passphrase` is required.
@@ -360,6 +360,16 @@ Encrypts an already-created partition. The partition must not be the rootfs, and
 #### Examples
 
 * ` --plugin cryptpart:"nopwd|cryptname=datapart|fstype=ext4|keyfile=/root/521f4471-8fa2-4ac3-ab96-6e5f00f67291.lek|mountpoint=/foo|partname=/dev/sda3|keyfile-location=usb|keydisk-id=LABEL=MYLABEL|nonint"` &mdash; Encrypt partition /dev/sda3 using the specified keyfile. The partition will be mounted on `/foo`. During boot the system will look for the keyfile on a USB disk with the label MYLABEL.
+
+#### Notes
+
+* The `cryptpart` plugin can be used such that the entire encryption process is nearly automatic. See <a href="Disk-Encryption#encrypting-other-partitions.md">Disk Encryption</a> for details. When using the `cryptpart` plugin with `defer-plugin` to encrypt a data partition, it will be done in a totally non-interactive manner. This means:
+
+* You MUST always specify `nonint` and provide either `nopwd` AND `keyfile` (`nonint|nopwd|keyfile=file.lek`), or alternatively, do not include `nopwd` but do include `passphrase` (`nonint|passphase=yourpassphrase`). **sdm does NOT check this!**
+
+* If you're using a keyfile, you must ensure that the keyfile is in the IMG. One way to do this: `--plugin copyfile:"from=/root/3449424f-1348-489d-9cdc-d4a2e1b6beef.lek|to=/root"`, which will copy the file from /root on the host system to /root in the IMG.
+
+* Only one of `keyfile` and `passphrase` may be used. This will be addressed in a future release.
 
 ### cryptroot
 
@@ -398,9 +408,11 @@ The `defer-plugin` is a bit different from other plugins. It takes a single argu
 
 This plugin is useful to accomplish tasks you want to complete on the newly-booted system that aren't needed immediately.
 
-For instance, the `apt-file` plugin installs apt-file and does an update. This is typically not needed initially when you first boot the system, and the update takes a bit of time. Use the `defer-plugin` to install `apt-file` later, which speeds up the customization process.
+For instance, the `apt-file` plugin installs apt-file and does an update. This is typically not needed initially when you first boot the system, and the update takes a bit of time. Use the `defer-plugin` to run the `apt-file` plugin later (see example), speeding up the customization process.
 
-The list of plugins that make sense to use with `defer-plugin` and have been tested: `apps`, `apt-file`, and `cryptpart`. The `apps` plugin `defer` argument and `defer-plugin:apps=<list>` are equivalent.
+The list of plugins that *have been tested* with `defer-plugin`: `apps`, `apt-file`, `cryptpart`, and `vnc`.
+
+`apps:apps=list` and `defer-plugin:apps=list` are equivalent.
 
 #### Arguments
 
@@ -408,7 +420,7 @@ This plugin has no defined argument names. See the examples.
 
 #### Examples
 
-* `--plugin defer-plugin:"apt-file"` &mdash; Run the `apt-file` plugin to install apt-file
+* `--plugin defer-plugin:"apt-file"` &mdash; Run the `apt-file` plugin to install and update apt-file
 * `--plugin defer-plugin:"defer-plugin:vnc:tigervnc=2540x1350,1880x960,1700x1200,1880x1100"` &mdash; Install and configure tigervnc virtual desktops
 
 When used in a pluglist, the above two would be:
