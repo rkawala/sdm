@@ -70,10 +70,12 @@ function getpartname() {
 }
 
 function cryptolog() {
-    local msg="$1" opts="$2" datefmt="%Y-%m-%d %H:%M:%S"
+    local msg="$1" opts="$2" datefmt="%Y-%m-%d %H:%M:%S" pfx="sdm-cryptconfig:" msgc
+
+    [[ "$msg" =~ "sdm-cryptconfig:" ]] && msgc="$msg" || msgc="$pfx $msg"
     if [ $xsdm -eq 1 ]
     then
-	! [[ "$opts" =~ "noconsole" ]] && [ "$msg" == "" ] && echo "$msg" > /dev/tty || echo "> $msg" > /dev/tty
+	[[ "$opts" =~ "noconsole" ]] || echo "$msgc" > /dev/console
     else
 	[ "$msg" == "" ] && echo "$msg" > /dev/tty || echo "> $msg" > /dev/tty
     fi
@@ -826,7 +828,7 @@ EOF
 }
 
 function domkinitramfs() {
-    cryptolog "Update initramfs with all the rootfs encryption settings in place"
+    cryptolog "Update initramfs with all the rootfs encryption settings in place" noconsole
     update-initramfs -u
 }
 
