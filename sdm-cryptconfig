@@ -7,7 +7,7 @@
 #
 
 function errexit() {
-    logifsdm "$1" noconsole
+    cryptolog "$1" noconsole
     echo -e "$1"
     exit 1
 }
@@ -69,10 +69,15 @@ function getpartname() {
     ispdevp $dev && echo "p${pn}" || echo "$pn"
 }
 
-function logifsdm() {
+function cryptolog() {
     local msg="$1" opts="$2" datefmt="%Y-%m-%d %H:%M:%S"
-    [ $xsdm -eq 1 ] && [ "$opts" != "noconsole" ] && echo "sdm-cryptconfig: $msg" > /dev/console
-    [ -f /etc/sdm/history ] && echo "$(thisdate) $msg" >> /etc/sdm/history
+    if [ $xsdm -eq 1 ]
+    then
+	! [[ "$opts" =~ "noconsole" ]] && [ "$msg" == "" ] && echo "$msg" > /dev/tty || echo "> $msg" > /dev/tty
+    else
+	[ "$msg" == "" ] && echo "$msg" > /dev/tty || echo "> $msg" > /dev/tty
+    fi
+    [ -f /etc/sdm/history ] && echo "$(thisdate) sdm-cryptconfig: $msg" >> /etc/sdm/history
 }
 
 function checknumeric() {
@@ -121,7 +126,7 @@ function installpkgsif() {
     IFS=" " read -a pkgs <<< $pkglist
     for p in "${pkgs[@]}"
     do
-	ispkginstalled $p && echo "  Package '$p' is already installed" || newpkgs="$newpkgs $p"
+	ispkginstalled $p && cryptolog "  Package '$p' is already installed" noconsole || newpkgs="$newpkgs $p"
     done
     [ "$newpkgs" == "" ] || apt-get install --no-install-recommends --yes $newpkgs
 }
@@ -195,13 +200,13 @@ function printinfo() {
     used1k=$(getfsdf "/" used)
     usedby=$((used1k*1024))
     usedstr=$(getgbstr $usedby)
-    echo ""
-    echo "> Rootfs '$rootfs' has $usedby bytes $usedstr used"
-    echo ""
-    echo "> You will need another disk for the encryption process to use as a scratch disk"
-    echo "  This disk must be larger than $usedstr and it will be over-written"
-    echo $"
-Reboot the system when you are ready to continue
+    cryptolog "" noconsole
+    cryptolog "Rootfs '$rootfs' has $usedby bytes $usedstr used" noconsole
+    cryptolog "" noconsole
+    cryptolog "You will need another disk for the encryption process to use as a scratch disk" noconsole
+    cryptolog "  This disk must be larger than $usedstr and it will be over-written" noconsole
+    cryptolog "" noconsole
+    cryptolog $"Reboot the system when you are ready to continue
 
 The system will start to reboot, but hang trying to read rootfs. It will try 30 times
 before giving up and dropping to the initramfs prompt: (initramfs)
@@ -235,29 +240,29 @@ sdmcryptfs will:
 * Once the system boots the sdm-cryptfs-cleanup service will run which:
   * Removes some one-time content and rebuilds initramfs
   * Reboots the system one last time
-"
+" noconsole
     if [ $xnopwd -eq 0 ]
     then
-	echo $"* As the system reboots you'll once again be prompted for the rootfs passphrase (Without the 30 tries)
+	cryptolog $"As the system reboots you'll once again be prompted for the rootfs passphrase (Without the 30 tries)
   ** The system will now ask for the rootfs passphrase like this every time the system boots **
-"
+" noconsole
     else
-	echo $"* As the system reboots it will hang until the USB keyfile disk is found in a USB drive
-"
+	cryptolog $"As the system reboots it will hang until the USB keyfile disk is found in a USB drive
+" noconsole
     fi
     if [ $xssh -eq 1 ]
     then
-	echo $"
+	cryptolog $"
 NOTE: You have configured SSH
       Please review https://github.com/gitbls/sdm/blob/master/Docs/Disk-Encryption.md
-"
+" noconsole
     fi
 }
 
 function wifimakewpa() {
     local pwd="$1" hashed=$2 psks
 
-    echo "> Create wpa_supplicant config for WiFi in initramfs"
+    cryptolog "Create wpa_supplicant config for WiFi in initramfs" noconsole
     mkdir -p /etc/wpa_supplicant
     [ "$hashed" == "" ] && psks="psk\"$pwd\"" || psks="psk=$pwd"
     cat > /etc/wpa_supplicant/wpa_supplicant-luks.conf << EOF
@@ -274,7 +279,7 @@ EOF
 }
 
 function wificonfiginitramfs() {
-    echo "> Create WiFi initramfs hook /etc/initramfs-tools/hooks/sdm-enable-wifi"
+    cryptolog "Create WiFi initramfs hook /etc/initramfs-tools/hooks/sdm-enable-wifi" noconsole
     cat > /etc/initramfs-tools/hooks/sdm-enable-wifi << 'EOF'
 #!/bin/sh
 set -e
@@ -334,7 +339,7 @@ EOF
     chmod 755 /etc/initramfs-tools/hooks/sdm-enable-wifi
 
     # Create init-premount script
-    echo "> Create WiFi initramfs init-premount script /etc/initramfs-tools/scripts/init-premount/sdm-premount-enable-wifi"
+    cryptolog "Create WiFi initramfs init-premount script /etc/initramfs-tools/scripts/init-premount/sdm-premount-enable-wifi" noconsole
     cat > /etc/initramfs-tools/scripts/init-premount/sdm-premount-enable-wifi << 'EOF'
 #!/bin/sh
 PREREQ=""
@@ -441,7 +446,7 @@ EOF
     chmod 755 /etc/initramfs-tools/scripts/init-premount/sdm-premount-enable-wifi
 
     # Create local-bottom script to kill wpa_supplicant
-    echo "> Create WiFi initramfs local-bottom cleanup script /etc/initramfs-tools/scripts/local-bottom/sdm-kill-wireless"
+    cryptolog "Create WiFi initramfs local-bottom cleanup script /etc/initramfs-tools/scripts/local-bottom/sdm-kill-wireless" noconsole
     cat > /etc/initramfs-tools/scripts/local-bottom/sdm-kill-wireless << 'EOF'
 #!/bin/sh
 PREREQ=""
@@ -468,7 +473,7 @@ function configcleanupsvc() {
 #
 # Set up service to run after next reboot that will rebuild initramfs (again) and reboot
 #
-    echo "> Configure run-once service to cleanup and rebuild initramfs after rootfs encryption completes and boots"
+    cryptolog "Configure run-once service to cleanup and rebuild initramfs after rootfs encryption completes and boots" noconsole
     cat > /etc/systemd/system/sdm-cryptfs-cleanup.service <<EOF
 [Unit]
 Description=sdm cryptroot cleanup service
@@ -482,7 +487,7 @@ ExecStart=/usr/local/bin/sdm-cryptfs-cleanup
 WantedBy=multi-user.target
 EOF
 
-    echo "> Create /usr/local/bin/sdm-cryptfs-cleanup script"
+    cryptolog "Create /usr/local/bin/sdm-cryptfs-cleanup script" noconsole
     cat > /usr/local/bin/sdm-cryptfs-cleanup <<'EOF'
 #!/bin/bash
 
@@ -501,10 +506,16 @@ function wait_startup_complete() {
     done
 }
 
+function thisdate() {
+    local datefmt="%Y-%m-%d %H:%M:%S"
+    echo  "$(date +"$datefmt")"
+}
+
 function echolog() {
     local msg="$1"
     echo "$msg" >/dev/console
     logger "$msg"
+    [ -f /etc/sdm/history ] && echo "$(thisdate) $msg" >> /etc/sdm/history
 }
 
 echolog "sdm-cryptfs-cleanup: Starting; System will restart automatically when completed"
@@ -581,7 +592,7 @@ else
 fi
 EOF
     chmod 755 /usr/local/bin/sdm-cryptfs-cleanup
-    pgrep systemd >/dev/null 2>&1 && echo "> (Ignore any RequiresMountsFor errors in the system journal)" && systemctl daemon-reload
+    pgrep systemd >/dev/null 2>&1 && cryptolog "  (Ignore any RequiresMountsFor errors in the system journal)" noconsole && systemctl daemon-reload
     systemctl enable sdm-cryptfs-cleanup > /dev/null 2>&1
 }
 
@@ -641,21 +652,25 @@ function doconfiginitramfs() {
     local kcmd="" knopwd=""
 
     # These both need to be set on initramfs-tools 0.142+rpt1 and earlier. This assumes OK. Remove uncommented line for earlier initramfs-tools
-    echo "> Update initramfs configuration for 'MODULES=most' and 'update_initramfs=all'"
+    cryptolog "Update initramfs configuration for 'MODULES=most' and 'update_initramfs=all'" noconsole
     sed -i "s/^MODULES=dep/MODULES=most/" /etc/initramfs-tools/initramfs.conf
 #*  sed -i "s/^update_initramfs=yes/update_initramfs=all/" /etc/initramfs-tools/update-initramfs.conf
 
-    echo "> Create /usr/bin/sdmluksunlock; runs in initramfs to unlock rootfs"
+    cryptolog "Create /usr/bin/sdmluksunlock; runs in initramfs to unlock rootfs" noconsole
     cat > /usr/bin/sdmluksunlock <<'EOF'
 #!/bin/bash
 #
 # called when it's time to read the LUKS unlock key, which is echoed to stdout/read by caller
 #
+function pmsg() {
+    echo "$1" >/dev/console
+}
+
 trydisks()
 {
-    echo "" >/dev/console
-    echo "> sdmluksunlock: Looking for USB disk with luks Key file '${kfn}'" >/dev/console
-    echo "" >/dev/console
+    pmsg ""
+    pmsg "> sdmluksunlock: Looking for USB disk with luks Key file '${kfn}'"
+    pmsg ""
     while :; do
 	sleep 1
 	while read usbpartition
@@ -663,23 +678,23 @@ trydisks()
 	    usbdevice=$(readlink -f $usbpartition)
 	    if mount $usbdevice /mnt 2>/dev/null
 	    then
-		#echo "> Mounted disk $usbdevice" >/dev/console
+		#pmsg "> Mounted disk $usbdevice"
 		if [ -e /mnt/$kfn ]
 		then
-		    #echo "> Found Key file '$kfn'" >/dev/console
-		    echo "> Unlocking rootfs" >/dev/console
+		    #pmsg "> Found Key file '$kfn'"
+		    pmsg "> Unlocking rootfs"
 		    cat /mnt/$kfn   #cat to sdmluksunlock caller for unlock
 		    umount $usbdevice >/dev/null 2>&1 || continue
-		    #echo "> sdmluksunlock: Kill askpass; Ignore 'Killed' message" >/dev/console
+		    #pmsg "> sdmluksunlock: Kill askpass; Ignore 'Killed' message"
 		    aps=$(ps e | grep askpass | grep -v grep | awk '{print $1}')
 		    [ "$aps" != "" ] && kill -KILL $aps >/dev/null 2>/dev/null
 		    exit
 		else
-		    #echo "% sdmluksunlock: Key '${kfn%.lek}' not found on this disk" >/dev/console
+		    #pmsg "% sdmluksunlock: Key '${kfn%.lek}' not found on this disk"
 		    umount $usbdevice >/dev/null 2>&1 || continue
 		fi
 	    else
-                #echo "% sdmluksunlock: This disk does not have a vfat partition" >/dev/console
+                #pmsg "% sdmluksunlock: This disk does not have a vfat partition"
 		umount $usbdevice >/dev/null 2>&1 || continue
 	    fi
 	done < <(compgen -G "/dev/disk/by-id/usb-*-part1")
@@ -708,17 +723,18 @@ then
     fi
 fi
 
-echo "" >/dev/console
-echo "" >/dev/console
+pmsg ""
+pmsg ""
 /lib/cryptsetup/askpass "Insert USB Keyfile Disk or type passphrase then press ENTER:"
 aps=$(ps e | grep trydisks | grep -v grep | awk '{print $1}')
 [ "$aps" != "" ] && kill -KILL $aps >/dev/null 2>/dev/null
 exit
 EOF
     chmod 755 /usr/bin/sdmluksunlock
-    echo "> Create /etc/initramfs-tools/hooks/luks-hooks"
+    cryptolog "Create /etc/initramfs-tools/hooks/luks-hooks" noconsole
     [ "$xkeyfile" != "" ] && kcmd="copy_file text /etc/sdm/assets/cryptroot/$xkeyfile /etc/$xkeyfile"
-    cat > /etc/initramfs-tools/hooks/luks-hooks <<EOF  # Can't use quoted EOF here
+    # can't use quoted EOF here
+    cat > /etc/initramfs-tools/hooks/luks-hooks <<EOF
 #!/bin/sh -e
 PREREQS=""
 case "\$1" in
@@ -747,7 +763,7 @@ exit 0
 EOF
     chmod 755 /etc/initramfs-tools/hooks/luks-hooks
 
-    echo "> Update /etc/initramfs-tools/modules to include crypto '$xcrypto' modules"
+    cryptolog "Update /etc/initramfs-tools/modules to include crypto '$xcrypto' modules" noconsole
     case "$xcrypto" in
 	xchacha)
 	    cat >> /etc/initramfs-tools/modules <<EOF
@@ -774,7 +790,7 @@ EOF
 	    ;;
     esac
 
-    echo "> Enable KEYMAP=y in /etc/initramfs-tools/initramfs.conf"
+    cryptolog "Enable KEYMAP=y in /etc/initramfs-tools/initramfs.conf" noconsole
     sed -i "s/KEYMAP=n/KEYMAP=y/" /etc/initramfs-tools/initramfs.conf
     #
     # Configure the network in initramfs.conf if requested
@@ -788,7 +804,6 @@ EOF
 	[ "$xnetmask" != "" ] && ips="${ips}${xnetmask}:" || ips="${ips}:"
 	[ "$xhostname" != "" ] && ips="${ips}${xhostname}:" || ips="${ips}:"
 	ips=${ips%:}
-	#echo "ipstatement: $ips"
 	echo "$ips" >> /etc/initramfs-tools/initramfs.conf
     fi
     #
@@ -796,23 +811,22 @@ EOF
     #
     if [ $xssh -eq 1 ]
     then
-	echo "> Configure SSH"
+	cryptolog "Configure SSH" noconsole
 	sed -i "s#\#DROPBEAR_OPTIONS=\"\"#DROPBEAR_OPTIONS=\"-I $xsshtimeout -j -k -s -p $xsshport -c bash -r /etc/dropbear/dropbear_ed25519_host_key\"#" /etc/dropbear/initramfs/dropbear.conf
-	echo "> Copy authorized keys file from '$xauthkeys'"
+	cryptolog "Copy authorized keys file from '$xauthkeys'" noconsole
 	cp $xauthkeys /etc/dropbear/initramfs/authorized_keys
 	if [ $xunique -eq 0 ]
 	then
-	    echo "> Convert openSSH host key for use in dropbear/initramfs"
+	    cryptolog "Convert openSSH host key for use in dropbear/initramfs" noconsole
 	    dropbearconvert openssh dropbear /etc/ssh/ssh_host_ed25519_key /etc/dropbear/initramfs/dropbear_ed25519_host_key
 	else
-	    echo "> Use unique SSH host key in dropbear/initramfs"
+	    cryptolog "Use unique SSH host key in dropbear/initramfs" noconsole
 	fi
     fi
 }
 
 function domkinitramfs() {
-    #echo "> Update initramfs with all the rootfs encryption settings in place"
-    logifsdm "sdm-cryptconfig: Update initramfs with all the rootfs encryption settings in place"
+    cryptolog "Update initramfs with all the rootfs encryption settings in place"
     update-initramfs -u
 }
 
@@ -820,9 +834,9 @@ function doupdateconfig() {
     local rootfs kfu="" kfuuid="none" ktries=""
 
     rootfs=$(findmnt --noheadings --output source /)
-    echo "> Update root statement in cmdline.txt"
+    cryptolog "Update root statement in cmdline.txt" noconsole
     sed -i "s#root=[0-9a-zA-Z-]*[ =][0-9a-zA-Z-]* #root=/dev/mapper/$xmapper #" /boot/firmware/cmdline.txt
-    echo "> Add cryptdevice '$xmapper' to cmdline.txt"
+    cryptolog "Add cryptdevice '$xmapper' to cmdline.txt" noconsole
     # 'rw' needed so crypt device is mounted read/write
     # luks.crypttab prevents systemd-cryptsetup-generator for reading crypttab
     sed -i "s# rw cryptdevice=$rootfs:$xmapper luks.crypttab=no##g" /boot/firmware/cmdline.txt # Delete in case
@@ -830,14 +844,13 @@ function doupdateconfig() {
     # mask the service in case other partitions encrypted; this will prevent systemd-cryptsetup errors in journal wrt already-mounted rootfs
     systemctl -q mask systemd-cryptsetup@$xmapper.service 2>/dev/null
 
-    echo "> Updated cmdline:"
-    cat /boot/firmware/cmdline.txt
-    echo ""
+    cryptolog "Updated cmdline:" noconsole
+    cryptolog "  $(cat /boot/firmware/cmdline.txt)" noconsole
 
-    echo "> Update /etc/fstab for the encrypted rootfs"
+    cryptolog "Update /etc/fstab for the encrypted rootfs" noconsole
     sed -i "s#PARTUUID=[0-9a-zA-Z-]* */ #/dev/mapper/$xmapper / #" /etc/fstab
 
-    echo "> Update /etc/crypttab"
+    cryptolog "Update /etc/crypttab" noconsole
     if [ "$xkeyfile" != "" ]
     then
 	kfuuid=$(basename $xkeyfile)
@@ -884,7 +897,9 @@ xwifipsk=0
 src=$(dirname "$(realpath "$0")")
 parsecmd $0 "$@"
 
-logifsdm "* sdm-cryptconfig command: $0 $*" noconsole
+[ $xreboot -eq 1 ] && cryptolog "Starting; System will restart automatically when complete" || cryptolog "Starting"
+
+cryptolog "Command: $0 $*" noconsole
 
 [ "$xmapper" == "" ] && xmapper="cryptroot"
 [ "$xcrypto" == "" ] && xcrypto="aes"
@@ -916,16 +931,15 @@ then
     then
 	if [ -f $src/sdmcryptfs ]
 	then
-	    echo "> Copy sdmcryptfs from $src"
+	    cryptolog "Copy sdmcryptfs from $src" noconsole
 	    cp $src/sdmcryptfs /usr/local/bin
 	else
-	    echo "> Copy sdmcryptfs from GitHub"
+	    cryptolog "Copy sdmcryptfs from GitHub" noconsole
 	    curl --fail --silent --show-error -L https://github.com/gitbls/sdm/raw/master/sdmcryptfs -o /usr/local/bin/sdmcryptfs
 	    chmod 755 /usr/local/bin/sdmcryptfs
 	fi
     fi
 fi
-logifsdm "sdm-cryptconfig Starting; System will restart automatically when complete"
 
 for o in doapt-installs config mkinitramfs updateboot
 do
@@ -933,16 +947,16 @@ do
 	doapt-installs)
 	    [ $xssh -eq 1 ] && db="dropbear-initramfs dropbear-bin" || db=""
 	    apps="cryptsetup cryptsetup-initramfs cryptsetup-bin lz4 gdisk e2fsprogs $db"
-	    echo "> Install $apps"
+	    cryptolog "Install $apps" noconsole
 	    if [ $xssh -eq 1 ]
 	    then
-		echo ""
-		echo "** Ignore dropbear WARNINGs about authorized_keys file **"
-		echo "   initramfs will be rebuilt with the authorized_keys file later"
-		echo ""
+		cryptolog "" noconsole
+		cryptolog "** Ignore dropbear WARNINGs about authorized_keys file **" noconsole
+		cryptolog "   initramfs will be rebuilt with the authorized_keys file later" noconsole
+		cryptolog "" noconsole
 		sleep 5
 	    fi
-	    installpkgsif $apps
+	    installpkgsif "$apps"
 	    ;;
 	config)
 	    # Save key values so they can be checked in sdm-cryptfs-cleanup
@@ -954,7 +968,7 @@ do
 	    then
 		if [ $xwifipsk -eq 1 ]
 		then
-		    echo "> Make WiFi PSK"
+		    cryptolog "Make WiFi PSK" noconsole
 		    pwd=$((IFS='=' read junk psk ; echo "$psk") < <((wpa_passphrase "$xwifissid" "$xwifipwd" | grep $'\tpsk=')))
 		    hashed=hashed
 		else
@@ -994,21 +1008,21 @@ then
     #
     if [ "$(systemctl get-default)" == "graphical.target" ]
     then
-	echo "> Disable graphical console for encryption process; will be reset to $(systemctl get-default) later"
+	cryptolog "Disable graphical console for encryption process; will be reset to $(systemctl get-default) later" noconsole
 	systemctl -q set-default multi-user.target
     fi
 fi
 
 if systemctl --quiet is-enabled getty@tty1
 then
-    echo "> Disable getty@tty1; will be re-enabled later"
+    cryptolog "Disable getty@tty1; will be re-enabled later" noconsole
     systemctl -q disable getty@tty1
     echo "re-enable-tty1" >>/etc/sdmcryptctl
 fi
 
 if [ $xquiet -eq 0 ]
 then
-    echo "> Enable verbose system restart"
+    cryptolog "Enable verbose system restart" noconsole
     grep -q -s quiet /boot/firmware/cmdline.txt && echo "clquiet" >>/etc/sdmcryptctl
     # NB restoring splash currently disabled bc passphrase prompt gets hidden
     grep -q -s splash /boot/firmware/cmdline.txt && echo "clsplash" >>/etc/sdmcryptctl
@@ -1027,13 +1041,14 @@ then
     wait_startup_complete "sdm-cryptoconfig: Wait for system startup to complete"
     secs=10
     logger "sdm-cryptconfig: System will restart in $secs seconds"
-    echo "" > /dev/console
-    echo "sdm-cryptconfig: System will restart in $secs seconds" > /dev/console
+    cryptolog "System will restart in $secs seconds"
     sleep $secs
     logger "sdm-cryptconfig: System restarting now"
-    echo "sdm-cryptconfig: System restarting now" > /dev/console
+    cryptolog "System restarting now"
     sleep 2
     reboot
+    exit 0
+else
+    [ $xsdm -eq 1 ] && cryptolog "Complete. Use tty[2-8] if needed"
+    exit 0
 fi
-[ $xsdm -eq 1 ] && echo "sdm-cryptconfig: Complete. Use tty[2-8] if needed" > /dev/console
-exit 0

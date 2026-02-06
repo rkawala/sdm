@@ -28,7 +28,7 @@ function thisdate() {
 
 function pmsg() {
     local msg="$1"
-    echo "> $(thisdate) $msg" ###>/dev/console
+    echo "> $(thisdate) $msg" >/dev/tty
 }
 
 function askyn() {
@@ -232,7 +232,7 @@ function save_rootfs() {
             then
 		mount -t tmpfs -o size=${rootfsize}M tmpfs /scratch
 		pmsg "Save rootfs '$rootfs' to RAM disk"
-		pmsg "rootfs save should take approximately $(printdt $(((partsize/256)/43)))"
+		pmsg "rootfs save should take less than $(printdt $(((partsize/256)/43)))"
 		xcompress=0
 	    fi
 	fi
@@ -248,7 +248,7 @@ function save_rootfs() {
 	mke2fs -F $scpart >/dev/null || exit 1
 	mount $scpart /scratch
 	pmsg "Save rootfs '$rootfs' to '$sdisk'"
-	pmsg "rootfs save should take approximately $(printdt $(((partsize/256)/51)))"
+	pmsg "rootfs save should take less than $(printdt $(((partsize/256)/51)))"
     fi
     starttime="$(getcbbdate)"
     if [ $xcompress -eq 0 ]
@@ -385,11 +385,11 @@ function restore_rootfs() {
     starttime="$(getcbbdate)"
     if [ $xcompress -eq 0 ]
     then
-	pmsg "rootfs restore should take approximately $(printdt $(((partsize/256)/15)))"
+	pmsg "rootfs restore should take less than $(printdt $(((partsize/256)/15)))"
 	#echo "dd bs=16M if=/scratch/uncompressed-rootfs.img of=/dev/mapper/$cryptdevice"
 	dd bs=16M if=/scratch/uncompressed-rootfs.img of=/dev/mapper/$cryptdevice
     else
-	pmsg "rootfs restore should take approximately $(printdt $(((partsize/256)/11)))"
+	pmsg "rootfs restore should take less than $(printdt $(((partsize/256)/11)))"
 	#echo "dd bs=16M if=/scratch/compressed-rootfs.lz4 | lz4 -d | bs=16M dd of=/dev/mapper/$cryptdevice"
 	dd bs=16M if=/scratch/compressed-rootfs.lz4 | lz4 -d | dd bs=16M of=/dev/mapper/$cryptdevice
     fi

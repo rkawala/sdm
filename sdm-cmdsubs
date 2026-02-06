@@ -90,8 +90,6 @@ function writediskids() {
 	sed -i "s/${olddiskid}/${newdiskid}/" $SDMPT/boot/cmdline.txt
 	# Quirks not there in bullseye or bookworm, but keep for posterity
 	#sed -i 's| sdhci\.debug_quirks2=4||' $SDMPT/boot/cmdline.txt
-	# init_resize disappeared in 2022-09-06 build, but keep this here for older IMGs
-	sed -i 's| init=/usr/lib/raspi-config/init_resize\.sh||' $SDMPT/boot/cmdline.txt
     fi
     if [ $fgpt -eq 0 ]
     then
@@ -484,8 +482,7 @@ EOF
 	fi
 	if [ $fnoexpandroot -eq 1 ]
 	then
-	    write_burnmsg "> Force --regen-ssh-host-keys for --no-expand-root"
-	    regensshkeys=1
+	    [ $regensshkeys -eq 0 ] && write_burnmsg "> Force --regen-ssh-host-keys for --no-expand-root" && regensshkeys=1
 	elif [[ $expandroot -eq 1 ]] && [[ "$burndev" != "" ]]
 	then
 	    if [ "$cvtrootfs" == "ext4" ] || [ "$cvtrootfs" == "" ] || ! ispluginselected cryptroot "${plugins}~${allplugins}"
@@ -664,7 +661,7 @@ EOF
 	    then
 		write_burnmsg "> Install btrfs-progs onto burned disk"
 		write_burnmsg ""
-		write_burnmsg "  NOTE: 'Couldn't identify/resolve/etc' errors during update-initramfs can be ignored"
+		write_burnmsg "  NOTE: Ignore 'Couldn't identify / resolve / etc' errors during update-initramfs"
 		write_burnmsg ""
 		sdm_runspawncmd Burn1 run-command "apt install --yes --no-install-recommends btrfs-progs"
 	    else

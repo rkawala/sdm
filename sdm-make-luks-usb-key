@@ -36,7 +36,7 @@ function pmsg() {
 }
 
 function doumount() {
-    grep -q -s /tmp/sdm /proc/mounts && umount /tmp/sdm
+    grep -q -s $keymount /proc/mounts && umount $keymount
 }
 
 function initdisk() {
@@ -46,7 +46,7 @@ function initdisk() {
     local dev=$1
     local fatstart=2048s fatend=73728s extstart=73728s extend=200706s
 
-    pmsg "> Initialize disk $dev for use as USB key disk"
+    pmsg "> Initialize disk $dev for use as USB keydisk"
     sgdisk --zap-all $dev >/dev/null 2>&1
     errifrc $? "? Error zapping all partitions on $dev"
 
@@ -139,15 +139,20 @@ function writekf2disk() {
     # copy the .lek file to the USB disk
     #
     local dev=$1
-    pmsg "> Copy LUKS keyfile '$xkeyfile' to the keyfile disk"
-    mount $(getspname $dev 1) /tmp/sdm
-    cp $xkeyfile /tmp/sdm
+    pmsg "> Copy LUKS keyfile '$xkeyfile' to the keydisk"
+    mount $(getspname $dev 1) $keymount
+    cp $xkeyfile $keymount
+    kfn=$(basename $xkeyfile)
+    pmsg "> Secure LUKS keyfile '$kfn' on the keydisk"
+    chmod 600 $keymount/$kfn
     if [ "$xhostname" != "" ]
     then
-	[ -f /tmp/sdm/hostkeys.txt ] || printf "%-24s %s\n" "Hostname" "LUKS Key UUID" >> /tmp/sdm/hostkeys.txt
-	printf "%-24s %s\n" "$xhostname" "$lukskey" >> /tmp/sdm/hostkeys.txt
+	[ -f $keymount/hostkeys.txt ] || printf "%-24s %s\n" "Hostname" "LUKS Key UUID" >> $keymount/hostkeys.txt
+	printf "%-24s %s\n" "$xhostname" "$lukskey" >> $keymount/hostkeys.txt
+	chmod 600 $keymount/hostkeys.txt
     fi
     doumount
+    rm -rf $keymount
 }
 
 function printhelp() {
@@ -219,6 +224,7 @@ xmbr=0
 xnodisk=0
 xpart2=0
 xnoretain=0
+keymount="/tmp/sdmkey"
 
 parsecmd $0 "$*"
 if [ $xnodisk -eq 0 ]
@@ -235,7 +241,7 @@ fi
 
 [ $xforce -eq 1 ] && xinit=1
 
-mkdir -p /tmp/sdm
+mkdir -p $keymount
 
 [ "$xkeyfile" == "" ] && genkeyfile
 
@@ -246,9 +252,9 @@ then
 	# Check for any files on the first partition
 	if [ $xforce -eq 0 ]
 	then
-	    if mount $(getspname $dev 1) /tmp/sdm
+	    if mount $(getspname $dev 1) $keymount
 	    then
-		if compgen -G "/tmp/sdm/*.lek" >/dev/null
+		if compgen -G "$keymount/*.lek" >/dev/null
 		then
 		    doumount
 		    askyn "There are keyfiles on '$(getspname $dev 1)'. Continue" || errexit "? Exit per user request"
@@ -274,7 +280,7 @@ if [ $xnodisk -eq 0 ]
 then
     slabel="|keydisk-id=LABEL=$xlabel"
     echo $"
-> LUKS USB key disk is ready
+> LUKS USB keydisk is ready
   For sdm-cryptconfig use:  --keyfile $keyfilefn
   For cryptpart plugin use: keyfile=${keyfilefn}$slabel
   For cryptroot plugin use: keyfile=$keyfilefn
