@@ -68,7 +68,7 @@ then
     args="$2"
     loadparams
     vldargs="|ops|op|"
-    vops="|update-apt-cacher|apt-update|apt-upgrade|apt-autoremove|finish-customization|config-defer|config-firstboot|graphics|pre-phase1|post-customization|shell|ssh|writeL10n|"
+    vops="|update-apt-cacher|apt-update|apt-upgrade|apt-autoremove|apt-xautoremove|finish-customization|config-defer|config-firstboot|graphics|pre-phase1|post-customization|shell|ssh|writeL10n|"
     rqdargs=""
     assetdir="$SDMPT/etc/sdm/assets/$pfx"
 
@@ -109,6 +109,12 @@ then
 		    fi    
 		;;
 		apt-autoremove)
+		    logtoboth "> Start 'apt autoremove'"
+		    logfreespace "at start of 'apt autoremove'"
+		    doaptrpterror "--yes autoremove" $showapt
+		    logfreespace "at end of 'apt autoremove'"
+		    ;;
+		apt-xautoremove)
 		    if [[ ! "$poptions" =~ "noautoremove" ]]
 		    then
 			logtoboth "> Start 'apt autoremove'"
