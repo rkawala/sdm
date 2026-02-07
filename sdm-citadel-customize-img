@@ -25,6 +25,14 @@ assets="."
 rm -f $assets/my.plugins.1
 [ -f $assets/my.plugins ] &&  mv $assets/my.plugins $assets/my.plugins.1
 
+# Delete user pi if it exists
+# Add citadel users.
+cat > my-userlist <<EOF
+deluser=pi
+adduser=rkawala|password-hash=$user_pass|redact|uid=1000|groups=rkawala,users,adm,dialout,audio,netdev,video,plugdev,cdrom,games,input,gpio,spi,i2c,render,sudo,systemd-journal
+adduser=git|password-hash=cannot-log-in-using-a-password|uid=1001|groups=git,users|nosudo
+EOF
+
 (cat <<EOF
 # Plugin List generated $(date +"%Y-%m-%d %H:%M:%S")
 EOF
@@ -35,14 +43,7 @@ EOF
 # Also note the docs say that the user plugin must be the first plugin(s) that run.
 (cat <<EOF
 
-# Delete user pi if it exists
-user:deluser=pi
-
-# Add citadel users.
-# I'm not sure if sdm generates the same /etc/group file that you get when you do a manual install.
-
-user:adduser=rkawala|password-hash=$user_pass|redact|uid=1000|groups=rkawala,users,adm,dialout,audio,netdev,video,plugdev,cdrom,games,input,gpio,spi,i2c,render,sudo,systemd-journal
-user:adduser=git|password-hash=cannot-log-in-using-a-password|uid=1001|groups=git,users|nosudo
+user:userlist=./my-userlist
 
 # Remove apps I don't want
 apps:remove=vlc,rpi-connect,chromium
@@ -91,7 +92,7 @@ mv ~/Downloads/$img .
 chmod 600 $img
 echo ""
 
-echo "--apt-dist-upgrade is not turned on"
-echo "--redact is not turned on"
+echo "--apt-dist-upgrade is turned on"
+echo "--redact is turned off"
 
-time $sudo /usr/local/bin/sdm --customize $img --plugin @$assets/my.plugins --extend --xmb 1024 --restart --regen-ssh-host-keys --showapt --aptcache localhost
+time $sudo /usr/local/bin/sdm --customize $img --plugin @$assets/my.plugins --extend --xmb 1024 --restart --regen-ssh-host-keys --showapt --aptcache localhost --apt-dist-upgrade
