@@ -57,7 +57,7 @@ apps:name=mybrowsers|defer=firefox
 apps:name=mytools|apps=keychain,lsof,iperf3,bind9-dnsutils,lz4
 
 # I took this list from andrewharle's gist. I omitted overlayroot.
-apps:name=coretools|apps=btrfs-progs,extrepo,git,apt-transport-https,nano,gpg,ca-certificates,apt-offline,apt-cacher-ng|defer=f2fs-tools,f3,systemd-container,whois,squashfs-tools,wl-clipboard
+apps:name=coretools|apps=btrfs-progs,extrepo,git,apt-transport-https,nano,gpg,ca-certificates,apt-offline,apt-cacher-ng|defer=f2fs-tools,f3,systemd-container,whois,squashfs-tools,wl-clipboard,restic
 apps:name=cryptoapps|defer=keepassxc
 apps:name=encryption-drivers|apps=cryptsetup,cryptsetup-initramfs,busybox,systemd-cryptsetup
 
