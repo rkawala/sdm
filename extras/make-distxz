@@ -83,7 +83,9 @@ pluglist=(apps \
 	      cloudinit \
 	      copydir \
 	      copyfile \
+	      cryptpart \
 	      cryptroot \
+	      defer-plugin \
 	      disables \
 	      docker-install \
 	      dovecot-imap \

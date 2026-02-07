@@ -1,5 +1,23 @@
 # Changelog
 
+## V15.2
+
+* New Features
+  * New plugin `defer-plugin` takes a pluglist entry that will be run after the system is fully booted; also synchronizes with rootfs encryption. See <a href="Docs/Plugins.md#defer-plugin">Documentation</a>
+  * `apps` plugin new `defer` argument defers installation of listed apps until system rebooted from sdm FirstBoot (uses `defer-plugin`)
+  * Disk Encryption
+    * New plugin `cryptpart` encrypts non-rootfs partitions created with the `parted` plugin; automatic when used with `defer-plugin`. See <a href="Docs/Disk-Encryption.md#encrypting-other-partitions">Encrypting Other Partitions</a> for a detailed discussion and working example
+    * `parted` plugin accepts fstype of `none` to create a partition with no filesystem
+* Improvements
+  * rootfs encryption performance improvements and improved btrfs rootfs encryption
+  * When burning, log host and details (as done for customization) in /etc/sdm/history
+  * sdm now uses /tmp/sdm instead of /mnt/sdm for mounts
+  * sdm-make-luks-key overhauled for improved ease of use; defaults to GPT partition table and ext4 key partition
+  * Enable `--expand-at-boot` on Buster
+* Bug Fixes
+  * sdmcryptfs outputs to current stdout instead of the console
+  * Correct redaction of `user` plugin arguments `password-hash` and `password-plain`
+
 ## V15.1
 
 * New Features

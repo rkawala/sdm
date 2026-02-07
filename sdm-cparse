@@ -2092,7 +2092,7 @@ function docleanup() {
     local zfsp zfsmpt
 
     zfsp="$(type -p zfs)"
-    zfsmpt="$(zfs list -o mountpoint -H rpool/ROOT/debian 2>/dev/null)"
+    [ "$zfsp" != "" ] && zfsmpt="$(zfs list -o mountpoint -H rpool/ROOT/debian 2>/dev/null)"
 
     for mnt in "${SDMPT:-/tmp/sdm}" "$SDMPX"
     do

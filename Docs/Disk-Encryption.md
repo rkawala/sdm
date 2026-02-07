@@ -2,19 +2,20 @@
 
 One tool that can be used to increase system security is encryption. This article discusses using sdm to configure encryption for a partition on a Raspberry Pi system disk. This makes the loss of a disk far less of a problem, since the content cannot be read without knowing how to decrypt the partition(s) either with a passphrase, Yubikey, or a USB Keyfile Disk.
 
-SDM supports any combination of an encrypted rootfs and/or encrypted data partitions.
+sdm supports any combination of an encrypted rootfs and/or encrypted data partitions.
 
 sdm configures encrypted partitions using <a href="https://gitlab.com/cryptsetup/cryptsetup">cryptsetup LUKS disk encryption</a>, a core component of RasPiOS and Debian. cryptsetup is fully-documented and well-supported.
 
 Although encryption does increase security, there are some challenges, such as:
 
-* The rootfs passphrase must be typed **on the console** *every* time the Pi reboots. If you don't want to type a passphrase, you can use a Yubikey or a USB Keyfile Disk, or enter the passphrase remotely via SSH. sdm fully supports both methods. Details below.
+* The rootfs passphrase must be typed **on the console** *every* time the Pi reboots. If you don't want to type a passphrase, you can use a Yubikey or a USB Keyfile Disk
+* If you want to use a passphrase on a headless Pi, you can use SSH to enter the passphrase remotely. Details below
 * At-rest encryption does not make the running system any more secure
 * This tool does not provide any way to undo disk encryption if you decide you don't want it
   * You'll have to rebuild the system disk
   * ***Good news:*** If you're using sdm to create your customized IMG, rebuilding your disk is much less of an issue
 
-With those caveats, if at-rest disk encryption is useful for you, sdm makes it quite simple to configure and use an encrypted rootfs and one or more data partitions.
+With those caveats, if encryption is useful for you, sdm makes it quite simple to configure and use an encrypted rootfs and optionally one or more data partitions.
 
 **NOTES**
 
@@ -30,9 +31,9 @@ With those caveats, if at-rest disk encryption is useful for you, sdm makes it q
 
 ## Overview
 
-There are many articles about rootfs disk encryption on the Internet. If you're interested in learning more about it, your favorite search engine will reveal a bazillion articles on the subject.
+There are many articles about rootfs disk encryption on the Internet. If you're interested in learning more about it, your favorite search engine will reveal a **bazillion articles** on the subject.
 
-*"It's unbelievably hard to successfully encrypt your SD card using those articles. Don't even think about it. Use `sdm` instead."* &mdash; Actual satisfied user
+*"It's unbelievably hard to successfully encrypt your SD card using those articles. Don't even think about it. Use `sdm` instead."* &mdash; Actual sdm user
 
 Additionally, <a href="https://en.wikipedia.org/wiki/Linux_Unified_Key_Setup">this Wikipedia article</a> discusses LUKS encryption, which is utilized to encrypt your rootfs.
 
@@ -48,7 +49,7 @@ This tool supports multiple methods of unlocking the encrypted rootfs. These inc
 * **Keyfile** &mdash; A <a href="Disk-Encryption.md#unlocking-rootfs-with-a-usb-keyfile-disk">keyfile</a> on a USB disk can unlock the rootfs
 * **Yubikey** &mdash; A <a href="Disk-Encryption.md#unlocking-rootfs-with-a-yubikey"> Yubikey </a> can unlock the rootfs
 
-Passphrase on the console is the default and madatory method. Keyfile and Yubikey are optional, but only one of Keyfile or Yubikey can be enabled. Specifically, enabling the Yubikey will render any configured keyfile ignored.
+Passphrase on the console is the default unlock method. Keyfile and Yubikey are optional, but only one of Keyfile or Yubikey can be enabled. Specifically, enabling the Yubikey will render any configured keyfile ignored. If a keyfile or Yubikey is configured, the passphrase is not required.
 
 SSH unlock can be used in any configuration.
 
@@ -450,7 +451,7 @@ That's the high level summary. Here are the detailed steps, including the use of
 * **Customize the IMG file** &mdash; This is not discussed here, but if you've made it this far, you know what this step is! Use sdm to configure the system just like you want it to be. Then, when you want to create a disk with an encrypted rootfs, follow on here.
 * **Make an sdm LUKS keydisk** &mdash; See <a href="Disk-Encryption.md#creating-a-usb-keyfile-disk"> here</a> for details. Use that keyname in your version of the above script.
   * **How many keyfiles?** Each partition can have its own keyfile on the same disk, or they can use the same keyfile. There is no default.
-  * *Pro tip: sdm-make-luks-usb-key leaves a copy of the generated keyfile in /root.* You can, of course, move it. sdm doesn't care. But keyfiles are the keys to your system. If you have no valid copies of the keyfile and you did not add a password unlock during the rootfs encryption process, you will have no way to access any of the data on that disk. This applies to the data partition as well.
+  * *Pro tip: sdm-make-luks-usb-key leaves a copy of the generated keyfile in /root.* You can, of course, move it. sdm doesn't care. But keyfiles are the keys to your system, and must be protected. If you have no valid copies of the keyfile and you did not add a password unlock during the rootfs encryption process, you will have no way to access any of the data on that disk. This applies to the data partition as well.
 * **Burn disk** &mdash; sdm burns the IMG to a disk. Once the disk is created sdm performs additional steps before the burn is complete:
   * The `cryptroot` plugin runs after the disk has been burned, in the context of the freshly-burned disk. `cryptroot` prepares the system for the encryption process.
     * Install required packages
@@ -605,26 +606,41 @@ done
 ```
 ## Common Difficulties
 
-If you intend to use a YubiKey or a USB key, but sdmcryptfs asks you for a passphrase, something is wrong. Stop and figure out how to correct it.
+* If you intend to use a YubiKey or a USB key, but sdmcryptfs asks you for a passphrase, something is wrong. Stop and figure out how to correct it.
 
-If you use `--plugin cryptpart`:
-* Use `journalctl` to watch for log entries generated by cryptpart. If all goes well, there'll be a log entry saying you should reboot. When you do, you'll see the newly-created partition.
-* cryptpart won't run unless a copy of your key is available immediately after you boot your newly-burned SD card. As shown in the example above, one way to make that happen is to use `--plugin copyfile:from=/root/some-big-uuid.lek|to=/delete-me|mkdirif` to put a copy of the key on the SD card, and specify `keyfile=/delete-me/some-big-uuid.lek` to cryptpart.
-* Specify a filesystem type of `none` to parted, and specify the filesystem type you want to cryptpart.
-
-* If you unlock a partition using a USB key, SDM doesn't automatically unmount that USB key. It's safe to just unplug it without unmounting it first.
+* If you use `--plugin cryptpart`:
+  * If you're using a USB keydisk, remember to use `--label` when you create the keydisk or the disk will not automount to unlock an encrypted data partition.
+  * Similarly, Be sure to provide that label to the `cryptpart` plugin argument `keydisk-id` as `LABEL=<mylabel>`. `LABEL` must be capitalized.
+  * Use `journalctl` to watch for log entries generated by cryptpart. If all goes well, there'll be a log entry saying you should reboot. When you do, you'll see the newly-created partition.
+  * Be patient. It can take several minutes for cryptpart to complete. Don't reboot until it's done.
+  * cryptpart won't run unless a copy of your key is available immediately after you boot your newly-burned SD card. As shown in the example above, one way to make that happen is to use `--plugin copyfile:from=/root/some-big-uuid.lek|to=/delete-me|mkdirif` to put a copy of the key on the SD card, and specify `keyfile=/delete-me/some-big-uuid.lek` to cryptpart.
+  * Specify a filesystem type of `none` to parted, and specify the filesystem type you want to cryptpart.
+  * If you unlock a partition using a USB key, sdm doesn't automatically unmount that USB key. It's safe to just unplug it without unmounting it first.
+* You must have a network connection when you run `sdm --customize`, and you must also have a network connection during "Second Boot" because sdm-cryptconfig may need to install `lz4`.
+* You will not see any error messages that sdm-cryptconfig might produce at second-boot time, although they are in the system journal, so this can be difficult to debug. This is not true, however, if sdm-cryptconfig is run interactively.
 
 * Be careful when you use the parted burn-plugin with `no-expand-root=y`. The latter will override any value you may have specified with `rootexpand=nnnn`.
 
-* If you use certain versions of `rpi-imager` to erase an SD card, an invalid MBR partition block is created. Use `parted /dev/sda mklabel msdos` instead.
+* If you need to erase an SD card, use `parted /dev/sda mklabel msdos`. Some versions of `rpi-imager` are known to create an invalid MBR partition block.
 
 * When you're running a customize or a burn, you'll gradually learn which error messages indicate a problem, and which ones can be ignored.
 
 * If you're using `--plugin apps:remove`
   * List all your removes before you start adding packages.
   * For more control over when the `apt autoremove` occurs, you can use `--plugin sdm.phaseops:ops=apt-autoremove` right after your last `apps` plugin `remove`
+    * This will ensure that as much free space as possible is available for subsequent steps.
 
 * If you're using Btrfs, consider adding `kernel=kernel8.img` to your config.txt file. Btrfs support for the -2712 kernel is marked as experimental.
+
+* When you're running a customize or a burn, you'll gradually learn which error messages indicate a problem, and which ones can be ignored. These can generally be ignored.
+  * During `--customize` and `--burn`
+    * `update-initramfs` will say "Couldn't identify type of root file system"
+    * `cryptsetup` will say "Couldn't resolve device"
+    * Something will say "invoke-rc.d: could not determine current run level"
+    * `parted` will say "You may need to update /etc/fstab"
+  * When you see the `(initramfs)` prompt
+    * "Magic mismatch"
+    * "Can't find valid F2FS filesystem in superblock"
 
 ## Acknowledgements
 
