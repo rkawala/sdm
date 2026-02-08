@@ -406,8 +406,21 @@ function setsmbpwd() {
 }
 
 function user_plugin_printkeys() {
+    local svpwd="$password" svpwdplain="$password__plan" svhashpwd="$password__hash"
 
+    if [ $fredact -eq 1 ]
+    then
+	[ -v password ] && password="REDACTED"
+	[ -v password__plain ] && password__plain="REDACTED"
+	[ -v password__hash ] && password__hash="REDACTED"
+    fi
     plugin_printkeys "$redactargs"
+    if [ $fredact -eq 1 ]
+    then
+	[ -v password ] && password="$svpwd"
+	[ -v password__plain ] && password__plain="$svpwdplain"
+	[ -v password__hash ] && password__hash="$svhashpwd"
+    fi
 }
 
 function user_plugin_getargs() {
@@ -435,7 +448,7 @@ function do_userlist() {
 	    [ $fredact -eq 1 ] || logtoboth "> Plugin $pfx: Line:  $line"
 	    plugin_getargs $pfx "$line" "$vldargs" || exit
 	    user_plugin_getargs
-	    plugin_printkeys "$redactargs"
+	    user_plugin_printkeys "$redactargs"
 	    $dofn
 	fi
     done
@@ -515,7 +528,7 @@ case "$phase" in
 	logtoboth "* Plugin $pfx: Start Phase post-install"
 	plugin_getargs $pfx "$args" "$vldargs"
 	user_plugin_getargs
-	#plugin_printkeys "$redactargs"
+	#user_plugin_printkeys "$redactargs"
 	if [ "$userlist" != "" ]
 	then
 	    ul="$assetdir/userlist-$(basename $userlist)"
