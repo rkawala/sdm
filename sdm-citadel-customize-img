@@ -87,8 +87,7 @@ EOF
 
 rm -f $img
 echo "Extracting $img"
-time unxz -k ~/Downloads/$img.xz
-mv ~/Downloads/$img .
+time unxz -k $img.xz
 chmod 600 $img
 echo ""
 
