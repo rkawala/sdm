@@ -30,7 +30,7 @@ rm -f $assets/my.plugins.1
 cat > my-userlist <<EOF
 deluser=pi
 adduser=rkawala|password-hash=$user_pass|redact|uid=1000|groups=rkawala,users,adm,dialout,audio,netdev,video,plugdev,cdrom,games,input,gpio,spi,i2c,render,sudo,systemd-journal
-adduser=git|password-hash=cannot-log-in-using-a-password|uid=1001|groups=git,users|nosudo
+adduser=git|password-hash=cannot-log-in-using-a-password|uid=1001|groups=git,users|nosudo|shell=/usr/bin/git-shell
 EOF
 
 (cat <<EOF
