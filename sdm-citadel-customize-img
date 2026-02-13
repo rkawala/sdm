@@ -82,6 +82,9 @@ system:"journal=persistent"
 # Set up my network
 network:"nmconf=/etc/NetworkManager/NetworkManager.conf|nmconn=/etc/NetworkManager/system-connections/TP-LINK_5Ghz_062869.nmconnection,/etc/NetworkManager/system-connections/TP-Link_5GHz_CF37E4.nmconnection"
 
+# Set up SSHD (note the lack of a trailing slash on the "from" attribute)
+copyfile:from=/etc/ssh/sshd_config.d|to=/etc/ssh
+
 EOF
     ) | bash -c "cat >>$assets/my.plugins"
 
