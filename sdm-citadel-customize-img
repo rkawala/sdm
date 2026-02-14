@@ -85,6 +85,9 @@ network:"nmconf=/etc/NetworkManager/NetworkManager.conf|nmconn=/etc/NetworkManag
 # Set up SSHD (note the lack of a trailing slash on the "from" attribute)
 copyfile:from=/etc/ssh/sshd_config.d|to=/etc/ssh
 
+# Use kernel8.img, because Btrfs says support for page size != block size is experimental
+bootconfig:"kernel=kernel8.img"
+
 EOF
     ) | bash -c "cat >>$assets/my.plugins"
 
