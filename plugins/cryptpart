@@ -35,7 +35,7 @@ phase=$1
 pfx="$(basename $0)"     #For messages
 args="$2"
 loadparams
-vldargs="|burndev|burnfilefile|cryptname|fslabel|fstype|keydisk-id|keyfile|keyfile-location|mountpoint|nonint|nopwd|partname|passphrase|"
+vldargs="|burndev|burnfilefile|cryptname|fslabel|fstype|keydisk-id|keyfile|keyfile-location|mountpoint|nocreate|nonint|nopwd|partname|passphrase|"
 rqdargs="|cryptname|fstype|partname|"
 assetdir="$SDMPT/etc/sdm/assets/$pfx"
 
@@ -46,6 +46,7 @@ then
     #
     logtoboth "* Plugin $pfx: Start Phase 0"
     plugin_getargs $pfx "$args" "$vldargs" "$rqdargs" || exit
+    [[ "$SDMNSPAWN" =~ Live ]] || logtobothex "? Plugin $pfx: Plugin invalid except with --runonly plugins on a live system"
     #
     # Print the keys found (example usage). plugin_getargs returns the list of found keys in $foundkeys
     #
@@ -106,46 +107,49 @@ then
     # encrypt the partition
     [ "$cipher" == "" ] && cipher="aes-xts-plain64"
     trap "cpcleanup" EXIT
-    if [ -v nopwd ]
+    if [ -v keyfile ]
     then
-	if [ -v keyfile ]
+	kfn=$(basename $keyfile)
+	kf=$assetdir/$kfn
+    fi
+    if [ ! -v nocreate ]
+    then
+	if [ -v nopwd ]
 	then
-	    kfn=$(basename $keyfile)
-	    kf=$assetdir/$kfn
-	fi
-	logtoboth "> Plugin $pfx: Enable LUKS encryption on partition '$partname' using keyfile '$kfn'"
-	while [ 0 ]
-	do
-	    if [ -v nonint ]
+	    logtoboth "> Plugin $pfx: Enable LUKS encryption on partition '$partname' using keyfile '$kfn'"
+	    while [ 0 ]
+	    do
+		if [ -v nonint ]
+		then
+		    printf "YES\n" | cryptsetup luksFormat --type luks2 $partname $kf
+		    sts=$?
+		else
+		    cryptsetup luksFormat --type luks2 $partname $kf
+		    sts=$?
+		fi
+		[ $sts -eq 0 ] && break
+		cpoptions $sts || logtobothex "? Plugin $pfx: Exit per user request"
+	    done
+	else
+	    logtoboth "> Plugin $pfx: Enable LUKS encryption on partition '$partname' with a passphrase"
+	    while [ 0 ]
+	    do
+		if [ -v nonint ]
+		then
+		    printf "$passphrase\n$passphrase\nYES\n" | cryptsetup luksFormat --type luks2 --cipher $cipher --hash sha256 --iter-time 5000 --key-size 256 --pbkdf argon2i $partname
+		    sts=$?
+		else
+		    cryptsetup luksFormat --type luks2 --cipher $cipher --hash sha256 --iter-time 5000 --key-size 256 --pbkdf argon2i $partname
+		    sts=$?
+		fi
+		[ $sts -eq 0 ] && break
+		cpoptions $sts || logtobothex "? Plugin $pfx: Exit per user request"
+	    done
+	    if [ -v keyfile ]
 	    then
-		printf "YES\n" | cryptsetup luksFormat --type luks2 $partname $kf
-		sts=$?
-	    else
-		cryptsetup luksFormat --type luks2 $partname $kf
-		sts=$?
+		logtoboth "> Plugin $pfx: Add keyfile '$kfn' to Luks partition '$partname'"
+		printf "$passphrase\n" | cryptsetup luksAddKey $partname $kf || logtobothex "? Plugin $pfx: cryptsetup luksAddKey failed ($?)"
 	    fi
-	    [ $sts -eq 0 ] && break
-	    cpoptions $sts || logtobothex "? Plugin $pfx: Exit per user request"
-	done
-    else
-	logtoboth "> Plugin $pfx: Enable LUKS encryption on partition '$partname' with a passphrase"
-	while [ 0 ]
-	do
-	    if [ -v nonint ]
-	    then
-		printf "$passphrase\n$passphrase\nYES\n" | cryptsetup luksFormat --type luks2 --cipher $cipher --hash sha256 --iter-time 5000 --key-size 256 --pbkdf argon2i $partname
-		sts=$?
-	    else
-		cryptsetup luksFormat --type luks2 --cipher $cipher --hash sha256 --iter-time 5000 --key-size 256 --pbkdf argon2i $partname
-		sts=$?
-	    fi
-	    [ $sts -eq 0 ] && break
-	    cpoptions $sts || logtobothex "? Plugin $pfx: Exit per user request"
-	done
-	if [ -v keyfile ]
-	then
-	    logtoboth "> Plugin $pfx: Add keyfile '$kfn' to Luks partition '$partname'"
-	    cryptsetup luksAddKey $partname $kf || logtobothex "? Plugin $pfx: cryptsetup luksAddKey failed ($?)"
 	fi
     fi
     if [ -v nopwd ]
@@ -165,19 +169,21 @@ then
 	done
     fi
 
-    # make file system
-    [ "$fslabel" != "" ] && mklabel="-l $fslabel"
-    [ "$fstype" == "" ] && fstype=ext4
-    case "$fstype" in
-	btrfs|ext4)
-	    logtoboth "> Plugin $pfx: Create '$fstype' file system on the encrypted partition"
-            mkfs.$fstype -q $mklabel /dev/mapper/$cryptname || logtobothex "? Plugin $pfx: mkfs.$fstype failed ($?)"
-            ;;
-	*)
-	    logtobothex "? Plugin $pfx: Unrecognized fstype '$fstype'"
-	    ;;
-    esac
-
+    if [ ! -v nocreate ]
+    then
+	# make file system
+	[ "$fslabel" != "" ] && mklabel="-l $fslabel"
+	[ "$fstype" == "" ] && fstype=ext4
+	case "$fstype" in
+	    btrfs|ext4)
+		logtoboth "> Plugin $pfx: Create '$fstype' file system on the encrypted partition"
+		mkfs.$fstype -q $mklabel /dev/mapper/$cryptname || logtobothex "? Plugin $pfx: mkfs.$fstype failed ($?)"
+		;;
+	    *)
+		logtobothex "? Plugin $pfx: Unrecognized fstype '$fstype'"
+		;;
+	esac
+    fi
     # add to /etc/crypttab and fstab
 
     logtoboth "> Plugin $pfx: Update config files..."
@@ -257,7 +263,7 @@ EOF
     fi
     if [ "${keyfile__location,,}" == "usb" ]
     then
-	logtoboth "> Plugin $pfx: Ignore non-existent unit 'systemd-cryptsetup@$cryptname.service' message"
+	logtoboth "> Plugin $pfx: any Ignore non-existent unit 'systemd-cryptsetup@$cryptname.service' message"
 	systemctl daemon-reload
 	systemctl enable $mountsvc.mount $dirname-unmount.service
     fi
