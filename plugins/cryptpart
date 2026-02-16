@@ -22,6 +22,28 @@ function cpoptions() {
     return 0
 }
 
+function getdevuuid() {
+    #
+    # Find PARTUUID or UUID for device/partition
+    # If device name is specified instead of a partition (/dev/sdc vs /dev/sdc1) blkid returns a PTUUID which is the UUID
+    #
+    local pname=$1
+    local blkidstr=$(blkid $pname) p1 uuid uuidstr=""
+
+    for pt in PARTUUID PTUUID UUID
+    do
+	p1=${blkidstr##*$pt=\"}
+	if [ "$p1" != "$blkidstr" ] # Different if we trimmed off part
+	then
+	    # Found it!
+            uuid="${p1%%\"*}"       # Get to the little L uuid only
+	    [ "$pt" == "PTUUID" ] && uuidstr="UUID=$uuid" || uuidstr="$pt=$uuid"
+            break
+	fi
+    done
+    echo "$uuidstr"
+}
+
 function loadparams() {
     source $SDMPT/etc/sdm/sdm-readparams
 }
@@ -36,7 +58,7 @@ pfx="$(basename $0)"     #For messages
 args="$2"
 loadparams
 vldargs="|burndev|burnfilefile|cryptname|fslabel|fstype|keydisk-id|keyfile|keyfile-location|mountpoint|nocreate|nonint|nopwd|partname|passphrase|"
-rqdargs="|cryptname|fstype|partname|"
+rqdargs="|cryptname|partname|"
 assetdir="$SDMPT/etc/sdm/assets/$pfx"
 
 if [ "$phase" == "0" ]
@@ -54,8 +76,10 @@ then
     mkdir -p $assetdir
     [[ "|root|usb|" =~ ${keyfile__location,,} ]] || logtobothex "? Plugin $pfx: '$keyfile__location' invalid value for 'keyfile-location'"
     [ "$fstype" != "" ] && [[ "btrfs,ext4" =~ $fstype ]] || logtobothex "? Plugin $pfx: Invalid fstype '$fstype'"
+    [ -v mountpoint ] && [ "$fstype" == "" ] && logtobothex "? Plugin $pfx: 'mountpoint' requires 'fstype'"
     [ -v nopwd ] && [ ! -v keyfile ] && logtobothex "? Plugin $pfx: 'nopwd' requires 'keyfile'"
     [ -v nonint ] && [ "$keyfile" == "" ] && [ "$passphrase" == "" ] && logtobothex "? Plugin $pfx: 'nonint' requires 'keyfile' or 'passphrase'"
+    [ "$(getdevuuid $partname)" == "" ] && logtobothex "? Plugin $pfx: Unable to obtain PARTUUID or UUID for '$partname'; does the device exist?"
     if [ "${keyfile__location,,}" == "usb" ]
     then
 	[ "$keydisk__id" == "" ] && logtobothex "keyfile-location=usb requires keydisk-id"
@@ -246,9 +270,10 @@ EOF
      fi
     logtoboth "> Plugin $pfx: Update /etc/crypttab"
     # Use UUID rather than partname in crypttab
-    partuuid=$(lsblk -o partuuid --noheadings $partname)
+    uuidstr=$(getdevuuid $partname)
+    [ "$uuidstr" == "" ] && logtobothex "? Plugin $pfx: Unable to obtain PARTUUID or UUID for '$partname'; does the device exist?"
     [ "$mountpoint" != "" ] && echo "# This V device mounted in /etc/fstab" >> $SDMPT/etc/crypttab
-    echo "$cryptname PARTUUID=$partuuid $kfloc luks,discard${opts}" >> $SDMPT/etc/crypttab
+    echo "$cryptname	$uuidstr $kfloc luks,discard${opts}" >> $SDMPT/etc/crypttab
     
     # add to fstab
     if [ "$mountpoint" != "" ]
