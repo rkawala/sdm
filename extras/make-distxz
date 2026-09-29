@@ -11,6 +11,7 @@ function dogen() {
     pushd $tmp > /dev/null
     echo "> Populate tmpdir '$tmp'"
     echo "sdm version: $sdmversion" > $tmp/version.sdm
+    touch $tmp/sdm.version-$sdmversion
     mkdir -p plugins 1piboot
     for f in ${sdmlist[*]}
     do
@@ -97,22 +98,27 @@ pluglist=(apps \
 	      hotspot \
 	      imon \
 	      knockd \
+	      kvm \
 	      L10n \
 	      labwc \
+	      ln \
 	      logwatch \
 	      lxde \
 	      mkdir \
 	      modattr \
+	      nbde-server-install \
 	      ndm \
 	      network \
 	      parted \
 	      piapps \
+	      pihole \
 	      pistrong \
 	      postburn \
 	      postfix \
 	      quietness \
 	      raspiconfig \
 	      runatboot \
+	      runcommand \
 	      runscript \
 	      rxapp \
 	      samba \
@@ -135,6 +141,7 @@ pluglist=(apps \
 	      wificonfig \
 	      wireguard \
 	      wsdd \
+	      x11 \
 	      )
 
 sdmversion=${1:-unknown}

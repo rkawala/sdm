@@ -5,17 +5,38 @@
 # The plugin is called three times: for Phase 0, Phase 1, and post-install.
 #
 
-function adjustzram() {
+function adjustrpiswap() {
     local swapsize=$1
     if [ -f /etc/rpi/swap.conf ]
     then
-	mkdir -p /etc/rpi/swap.conf.d
-	cp /etc/rpi/swap.conf /etc/rpi/swap.conf.d/99-sdm-swap.conf
-	sed -i "s/#MaxSizeMiB=.*/MaxSizeMiB=$swapsize/" /etc/rpi/swap.conf.d/99-sdm-swap.conf
+	if [ ! -f /etc/rpi/swap.conf.d/99-sdm-swap.conf ]
+	then
+	    mkdir -p /etc/rpi/swap.conf.d
+	    cp /etc/rpi/swap.conf /etc/rpi/swap.conf.d/99-sdm-swap.conf
+	fi
+	sed -i "/^\[File\]/,/^\[/ s/^[#]*FixedSizeMiB=.*/FixedSizeMiB=$swapsize/" /etc/rpi/swap.conf.d/99-sdm-swap.conf
     else
 	logtobothex "? Plugin $pfx: rpi-swap installed but /etc/rpi/swap.conf not found"
     fi
 }
+
+function adjustrpizram() {
+    local zramsize=$1
+    if [ -f /etc/rpi/swap.conf ]
+    then
+	if [ ! -f /etc/rpi/swap.conf.d/99-sdm-swap.conf ]
+	then
+	    mkdir -p /etc/rpi/swap.conf.d
+	    cp /etc/rpi/swap.conf /etc/rpi/swap.conf.d/99-sdm-swap.conf
+	fi
+	sed  -i "/^\[Zram\]/,/^\[/ s/^[#]*FixedSizeMiB=.*/FixedSizeMiB=$zramsize/" /etc/rpi/swap.conf.d/99-sdm-swap.conf
+    else
+	logtobothex "? Plugin $pfx: rpi-swap installed but /etc/rpi/swap.conf not found"
+    fi
+}
+
+
+
 
 function loadparams() {
     source $SDMPT/etc/sdm/sdm-readparams
@@ -31,7 +52,7 @@ pfx="$(basename $0)"     #For messages
 args="$2"
 maxsys=32                #Max number times system plugin can be invoked
 loadparams
-vldargs="|cron-d|cron-daily|cron-hourly|cron-weekly|cron-monthly|cron-systemd|eeprom|exports|fstab|journal|ledheartbeat|modprobe|motd|name|rclocal|service-disable|service-enable|service-disable-at-boot|service-enable-at-boot|service-mask|swap|sysctl|systemd-config|udev|"
+vldargs="|cron-d|cron-daily|cron-hourly|cron-weekly|cron-monthly|cron-systemd|eeprom|exports|fstab|journal|ledheartbeat|modprobe|motd|name|rclocal|service-disable|service-enable|service-disable-at-boot|service-enable-at-boot|service-mask|swap|sysctl|systemd-config|udev|videomode|zram|"
 rqdargs=""
 argswithfiles="|cron-d|cron-daily|cron-hourly|cron-weekly|cron-monthly|exports|fstab|modprobe|motd|sysctl|udev|"
 eepromvals="|critical|stable|beta|"
@@ -91,6 +112,7 @@ then
 			logtoboth "> Plugin $pfx: Copy '$fl' to $assetdir/$chyp"
 			[ -f $fl ] || logtobothex "? Plugin $pfx: '$chyp' file '$fl' not found"
 			cp -a $fl $assetdir/$chyp
+			[ "$fl" == "/tmp/motd-null" ] && rm -f /tmp/motd-null
 		    else
 			logtobothex "? Plugin $pfx: Argument $chyp file '$fl' not found"
 		    fi
@@ -364,9 +386,9 @@ EOF
 		IFS="," read -a ssvc <<< "$cval"
 		for c in "${ssvc[@]}"
 		do
-		    logtoboth "> Plugin $pfx: Mask service '$c'"
+		    logtoboth "> Plugin $pfx: Disable and Mask service '$c'"
+		    systemctl disable -q $c >/dev/null 2>&1 #Silence this in case not installed
 		    systemctl mask -q $c
-		    warnifrc $? "% Plugin $pfx: Error masking service '$c'"
 		done
 		;;
 	    swap)
@@ -377,7 +399,7 @@ EOF
 			    if ispkginstalled rpi-swap
 			    then
 				logtoboth "> Plugin $pfx: Disable zram"
-				adjustzram 0
+				adjustrpiswap 0
 			    elif ispkginstalled dphy-swapfile
 			    then
 				logtoboth "> Plugin $pfx: Disable swapfile"
@@ -393,8 +415,8 @@ EOF
 			    then
 				if ispkginstalled rpi-swap
 				then
-				    logtoboth "> Plugin $pfx: Set zram size to ${swapsize}MB"
-				    adjustzram $swapsize
+				    logtoboth "> Plugin $pfx: Set swap size to ${swapsize}MB"
+				    adjustrpiswap $swapsize
 				elif ispkginstalled dphy-swapfile
 				then
 				    logtoboth "> Plugin $pfx: Set swap ${swapsize}MB"
@@ -441,6 +463,44 @@ EOF
 		    cp -a $fl /etc/udev/rules.d
 		    setfileownmode /etc/udev/rules.d/$(basename $fl) 644
 		done
+		;;
+	    videomode)
+		if [ -f /boot/cmdline.txt ]
+		then
+		    if grep -q video= /boot/cmdline.txt
+		    then
+			logtoboth "> Plugin $pfx: Update cmdline video mode to 'video=$videomode' in cmdline.txt"
+			sed -i "1 s/video=.*/video=$videomode /" /boot/cmdline.txt
+		    else
+			logtoboth "> Plugin $pfx: Add cmdline video mode 'video=$videomode' to cmdline.txt"
+			sed -i "1 s/^/video=$videomode /" /boot/cmdline.txt
+		    fi
+		elif [ -f /boot/firmware/cmdline.txt ]
+		then
+		    if grep -q video= /boot/firmware/cmdline.txt
+		    then
+			logtoboth "> Plugin $pfx: Update cmdline video mode to 'video=$videomode' in cmdline.txt"
+			sed -i "1 s/video=.*/video=$videomode /" /boot/firmware/cmdline.txt
+		    else
+			logtoboth "> Plugin $pfx: Add cmdline video mode 'video=$videomode' to cmdline.txt"
+			sed -i "1 s/^/video=$videomode /" /boot/firmware/cmdline.txt
+		    fi
+		fi
+		;;
+	    zram)
+		if ispkginstalled rpi-swap
+		then
+		    zramsize=$(($zram))
+		    if [ $zramsize -gt 0 ]
+		    then
+			logtoboth "> Plugin $pfx: Set zram size to ${zramsize}MB"
+			adjustrpizram $zramsize
+		    else
+			logtoboth "% Plugin $pfx: zram not configured per zram '$zram'"
+		    fi
+		else
+		    logtoboth "% Plugin $pfx: rpi-swap not installed to set zram size"
+		fi
 		;;
 	esac
     done

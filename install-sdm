@@ -102,6 +102,8 @@ else
     $sudo tar --extract --xz $v --file $tarball --overwrite -C $dir || errexit "? Error ($?) untarring sdm tarball '$tarball'"
 fi
 
+[ compgen "$dir/sdm.version-*" > /dev/null 2>&1 ] && rm -f $dir/sdm.version-*
+
 etc="/etc"
 
 if [ "$dir" == "/usr/local/sdm" ]
@@ -189,7 +191,7 @@ fi
 [[ $EUID -ne 0 ]] && sudo="sudo"
 echo "* Update apt"
 $sudo apt update
-pkgs="binfmt-support coreutils gdisk keyboard-configuration parted qemu-user-static rsync systemd-container uuid"
+pkgs="binfmt-support coreutils file fdisk gdisk keyboard-configuration parted qemu-user-static rsync systemd-container usbutils uuid"
 echo "* Ensure required packages are installed: $pkgs"
 echo "> Install any needed packages"
 $sudo apt-get install --yes --no-install-recommends $pkgs
@@ -197,12 +199,12 @@ $sudo apt-get install --yes --no-install-recommends $pkgs
 echo ""
 if [ "$dir" == "/usr/local/sdm" -a "$(type -p sdm)" != "" ]
 then
-    echo "* Invoke sdm with 'sudo sdm'"
+    echo "* Invoke sdm with 'sdm'"
 else
-    echo "* Invoke sdm with 'sudo $dir/sdm'"
+    echo "* Invoke sdm with '$dir/sdm'"
     echo "* You can make an ease-of-use link with: sudo ln -s $dir/sdm /usr/local/bin/sdm"
     echo "    (or anywhere else in your PATH)"
-    echo "  so you can invoke sdm with 'sudo sdm'"
+    echo "  so you can invoke sdm with 'sdm'"
 fi
 
 echo $"

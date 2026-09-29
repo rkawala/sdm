@@ -67,7 +67,7 @@ sdm --runonly plugins --burn-plugin extractfs:"rootfs=/path/to/rootfs|bootfs=/pa
 
 There are a couple of plugin ordering issues to be aware of.
 * The `user` plugin(s) should be the first plugin. Several other plugins expect this.
-* The `cryptroot` plugin must be after the graphics plugin in order to properly manage boot behavior during the encryption process
+* The `cryptroot` plugin must be after the `graphics` plugin and the `raspiconfig` plugin setting `boot_behavior` in order to properly manage boot behavior during the encryption process
 * The `boot_behavior` final setting is order-sensitive. The last modification wins.
   * During the post-install phase, if `--plugin graphics` is used, the `graphics` plugin will set the boot behavior. If the `graphics` plugin is not used, this will run automatically at the end of the post-install phase.
     * If the display manager is lightdm, `boot_behavior` is set: B3 or B4 per the `--autologin` switch
@@ -157,6 +157,7 @@ apt-config provides some control over apt in the customized IMG
 #### Arguments
 
 * `no-install-recommends` &mdash; Disable installing recommended software
+* `confnew` &mdash; &mdash; always replace a config file without prompting
 * `confold` &mdash; &mdash; always keep old unmodified copy of a config file without prompting
 * `confdef` &mdash; prefer the default method in the package for handling config file conflicts. If no default action specified by a package, falls back to `confold` if specified
 * `nopager` &mdash; Disable use of pager in `apt` listing commands
@@ -210,6 +211,35 @@ Alternatively, you can use:
 --plugin bootconfig:"dtparam=fan_temp1=62500,fan_temp1_hyst=5000,fan_temp1_speed=128,fan_temp0=55000,fan_temp0_hyst=5000,fan_temp0_speed=75"
 ```
 RasPiOS has a line length limit of 98 for config.txt, and silently ignores characters beyond that length. The bootconfig plugin limits lines to 96 characters.
+
+### btrfs-config
+
+The `btrfs-config` plugin is a `--burn-plugin` to apply btrfs-specific optimizations. It should be used with `--convert-root btrfs`.
+
+The plugin works with both device burns (`--burn`) and file burns (`--burnfile`).
+
+**Note:** You may also want to use `--convert-root-mount-options "compress=zstd"` to save space and IO.
+
+#### Arguments
+
+* **imgtype** &mdash; (Required) The image type being burned
+* **preset** &mdash; Subvolume layout preset. Default: `default`
+* **verbose** &mdash; Print the voluminous output from moving top-level contents into @ subvolume. Default: Don't print.
+
+#### Presets
+
+Currently the only preset is `default`, to:
+
+1. move root filesystem to a new `@` subvolume
+2. set `@` subvolume the default of filesystem (filesystem root can still be mounted with `subvol=/`)
+3. add `rootflags=subvol=@` to cmdline.txt
+3. set mount option `defaults,subvol=@,compress=zstd,noatime,nodiratime` to fstab
+
+Other settings can be defined as new preset. One can also mount again after `sdm --burn` completes and tune as needed.
+
+#### Examples
+
+* `sdm --burn /dev/sdc --convert-root btrfs --expand-root --burn-plugin btrfs-config /path/to/raspios.img` &mdash; Burn to a device with `default` preset
 
 ### btwifiset
 
@@ -346,10 +376,12 @@ Encrypts an already-created partition. The partition must not be the rootfs, and
 * **cryptname** &mdash; The encrypted mapped device name (must be unique for each encrypted partition)
 * **fslabel** &mdash; File system label for the created file system
 * **fstype** &mdash; File system type. `ext4` [Default] and `btrfs` are valid
-* **keydisk-id** &mdash; The identifier for the USB keydisk. Can be LABEL=thelabel or PARTUUID=thepartuuid for the USB keydisk. Required if `keyfile-location` is `usb`. `sdm-make-luks-key can be used to create a key disk with a specified label.
+* **keydisk-id** &mdash; The identifier for the USB keydisk. Can be LABEL=thelabel or PARTUUID=thepartuuid for the USB keydisk. Required if `keyfile-location` is `usb`. `sdm-make-luks-key` can be used to create a key disk with a specified label.
 * **keyfile** &mdash; /path/to/keyfile
-* **keyfile-location** &mdash; Valid locations are `usb` (on a USB disk) or `root` (in /root)
+* **keyfile-location** &mdash; Valid locations are `usb` (on a USB disk) or `root` (in /root). Default is `root`
 * **mountpoint** &mdash; /path/to/directory for the partition mount point. If not specified, it will not be configured
+* **nbde-server** &mdash; URL of NBDE server. See <a href="Disk-Encryption.md#nbde">here for details</a>.
+* **nocreate** &mdash; Do not encrypt the partition nor make a file system on it. See Notes below.
 * **nonint** &mdash; Perform the encryption non-interactive. Requires `keyfile` or `passphrase`
 * **nopwd** &mdash; Do not add an unlock passphrase. Requires `keyfile`
 * **partname** &mdash; Partition to encrypt [/dev/sdXn, e.g., /dev/sda3]. Required. See <a href="Disk-Encryption.md#encrypting-other-partitions">Encrypting Other Partitions</a> for details.
@@ -360,23 +392,34 @@ Encrypts an already-created partition. The partition must not be the rootfs, and
 #### Examples
 
 * ` --plugin cryptpart:"nopwd|cryptname=datapart|fstype=ext4|keyfile=/root/521f4471-8fa2-4ac3-ab96-6e5f00f67291.lek|mountpoint=/foo|partname=/dev/sda3|keyfile-location=usb|keydisk-id=LABEL=MYLABEL|nonint"` &mdash; Encrypt partition /dev/sda3 using the specified keyfile. The partition will be mounted on `/foo`. During boot the system will look for the keyfile on a USB disk with the label MYLABEL.
+* ` --plugin defer-plugin:"cryptpart:nopwd|cryptname=datapart|fstype=ext4|keyfile=/root/521f4471-8fa2-4ac3-ab96-6e5f00f67291.lek|mountpoint=/foo|partname=/dev/sda3|keyfile-location=usb|keydisk-id=LABEL=MYLABEL|nonint"` &mdash; This is an example of using the above `cryptpart` example with the `defer-plugin` in a burn command so that the partition is encrypted *after* the FirstBoot process has completed.
 
 #### Notes
+
+* The `cryptpart` plugin can *only* be run on a live system using `sdm --runonly plugins`. To include it in the burn process use the <a href="Plugins.md#defer-plugin">`defer-plugin` plugin</a>
 
 * The `cryptpart` plugin can be used such that the entire encryption process is nearly automatic. See <a href="Disk-Encryption#encrypting-other-partitions.md">Disk Encryption</a> for details. When using the `cryptpart` plugin with `defer-plugin` to encrypt a data partition, it will be done in a totally non-interactive manner. This means:
 
 * You MUST always specify `nonint` and provide either `nopwd` AND `keyfile` (`nonint|nopwd|keyfile=file.lek`), or alternatively, do not include `nopwd` but do include `passphrase` (`nonint|passphase=yourpassphrase`). **sdm does NOT check this!**
 
-* If you're using a keyfile, you must ensure that the keyfile is in the IMG. One way to do this: `--plugin copyfile:"from=/root/3449424f-1348-489d-9cdc-d4a2e1b6beef.lek|to=/root"`, which will copy the file from /root on the host system to /root in the IMG.
+* If you're using a keyfile without `keyfile-location=usb`, you must ensure that the keyfile is in the IMG. One way to do this: `--plugin copyfile:"from=/root/3449424f-1348-489d-9cdc-d4a2e1b6beef.lek|to=/root"`, which will copy the file from /root on the host system to /root in the IMG.
 
-* Only one of `keyfile` and `passphrase` may be used. This will be addressed in a future release.
+* The `nocreate` argument can be used to wire up an already-encrypted partition into the system. The partition must be encrypted with a keyfile and/or a passphrase. If using a keyfile, the keydisk must be available during the system boot. The system will prompt for the unlock passphrase if only a passphrase is configured (that is, no keyfile).
+  * You must specify the unlock options (passphrase and/or keyfile) correctly. These are NOT verified by the plugin.
+
+* If both `passphrase` and `keyfile` are provided, the `keyfile` will be used by systemd-cryptsetup during system boot. The `passphrase` can be used for manually unlocking the partition outside of the normal boot flow, if needed.
+
+* The `nbde-server` argument is incompatible with `keydisk-location=usb` (systemd service orchestration problems)
+
+* When `nbde-server` is used with a passphrase and the NBDE server is not reachable, the boot will continue, but the encrypted partition will not be mounted. In this case, unlock and mount the encrypted partition via the command `systemd-tty-ask-password-agent --query` from a logged-in session.
 
 ### cryptroot
 
-Configures the rootfs for encryption. See <a href="Disk-Encryption.md">Disk Encryption</a> for complete details
+Configures the rootfs for encryption. See <a href="Disk-Encryption.md#nbde-and-cryptpart">Disk Encryption</a> for complete details
 
 #### Arguments
 
+* **auto-encrypt** &mdash; Specifies that automatic rootfs encryption should be done. The required value specifies the name of the scratch disk (e.g., /dev/sdb). Requires `nopwd` and `keyfile`
 * **authkeys** &mdash; Provides an SSH authorized keys file for use in the initramfs
 * **crypto** &mdash; Specifies the encryption to use. `aes` used by default. Use `xchacha` on Pi4 and earlier for best performance.
 * **dns** &mdash; DNS server address for the intramfs network client to use
@@ -385,6 +428,7 @@ Configures the rootfs for encryption. See <a href="Disk-Encryption.md">Disk Encr
 * **ipaddr** &mdash; IP address for the intramfs network client to use
 * **keyfile** &mdash; A keyfile used for passphrase-less booting. See <a href="Disk-Encryption.md#unlocking-rootfs-with-a-usb-keyfile-disk">Unlocking rootfs with a USB Keyfile Disk</a> for details
 * **mapper** &mdash; Mapper name for the rootfs encryption (shows up, for instance, in the `df` listing)
+* **nbde-server** &mdash; URL of NBDE server. See <a href="Disk-Encryption.md#nbde">here for details</a>.
 * **netmask** &mdash; Network mask for the intramfs network client to use
 * **no-expand-root** &mdash; Do not expand the encrypted rootfs. See <a href="Disk-Encryption.md#btrfs-rootfs-and-rootfs-expansion">btrfs and rootfs expansion</a> for details.
 * **nopwd** &mdash; Configure only a keyfile to unlock the rootfs. No passphrase will be configured. The `keyfile` argument is required
@@ -402,6 +446,10 @@ These are discussed further in the above-mentioned Disk Encryption page.
 
 * `--plugin cryptroot:"authkeys=/home/bls/.ssh/authorized_keys|ssh` Configures the rootfs for encryption and enables SSH into the initramfs with keys authorized in the named authorized_keys file.
 
+#### Notes
+
+* Unlike the `cryptpart` plugin, `keyfile-location=usb` CAN be used in conjunction with `nbde-server` (different code paths) with the `cryptroot` plugin.
+
 ### defer-plugin
 
 The `defer-plugin` is a bit different from other plugins. It takes a single argument, which is a plugin string. The specified plugin is run VERY late: After the system has fully booted. This means that sdm-cryptconfig has completed and rebooted the system, and there is no rootfs encryption in progress.
@@ -410,24 +458,35 @@ This plugin is useful to accomplish tasks you want to complete on the newly-boot
 
 For instance, the `apt-file` plugin installs apt-file and does an update. This is typically not needed initially when you first boot the system, and the update takes a bit of time. Use the `defer-plugin` to run the `apt-file` plugin later (see example), speeding up the customization process.
 
-The list of plugins that *have been tested* with `defer-plugin`: `apps`, `apt-file`, `cryptpart`, and `vnc`.
+The list of plugins that *have been tested* with `defer-plugin`: `apps`, `apt-file`, `cryptpart`, `runatboot`, and `vnc`.
 
 `apps:apps=list` and `defer-plugin:apps=list` are equivalent.
 
 #### Arguments
 
-This plugin has no defined argument names. See the examples.
+Generally, this plugin has no defined argument names. However, there are two special arguments:
+
+* `defer-reboot` &mdash; Takes an optional argument which is the number of seconds until the system reboots [Default:5]
+* `defer-command` &mdash; takes a string which is the command to run
+
+The above arguments are run *after* all deferred plugins are run.
 
 #### Examples
 
 * `--plugin defer-plugin:"apt-file"` &mdash; Run the `apt-file` plugin to install and update apt-file
-* `--plugin defer-plugin:"defer-plugin:vnc:tigervnc=2540x1350,1880x960,1700x1200,1880x1100"` &mdash; Install and configure tigervnc virtual desktops
+* `--plugin defer-plugin:"vnc:tigervnc=2540x1350,1880x960,1700x1200,1880x1100"` &mdash; Install and configure tigervnc virtual desktops
 
 When used in a pluglist, the above two would be:
 ```
 defer-plugin:apt-file
-defer-plugin:defer-plugin:vnc:tigervnc=2540x1350,1880x960,1700x1200,1880x1100
+defer-plugin:vnc:tigervnc=2540x1350,1880x960,1700x1200,1880x1100
 ```
+Here are a couple of examples of the `defer-command` and `defer-reboot`
+
+* `--plugin defer-plugin:"defer-command:ls -l /"` &mdash; Perform an `ls -l /` command. The output of any `defer-command` will be found in the system journal (journalctl)
+* `--plugin defer-plugin:"defer-command:sleep 30"` &mdash; Pause the defer processing for 30 seconds. This may be useful ahead of a `defer-reboot` to give you time to check the system journal output
+* `--plugin defer-plugin:defer-reboot` &mdash; Reboot the system in 5 seconds
+* `--plugin defer-plugin:defer-reboot:20`&mdash; Reboot the system in 20 seconds
 
 ### disables
 
@@ -652,6 +711,32 @@ knockd installs the knockd service and <a href="https://github.com/gitbls/pktabl
 * **config** &mdash; Full path to your knockd.conf. If **config** isn't provided, /etc/knockd.conf will be the standard knockd.conf
 * **localsrc** &mdash; Locally accessible directory where pktables, knockd-helper, and knockd.service can be found, instead of downloading them from GitHub. If there is a knockd.conf in this directory, it will be used, unless overridden with the **config** argument
 
+### kvm
+
+Enable virtualization on the host system. The kvm plugin:
+
+* Installs the necessary software packages (libvirt, qemu, etc)
+* Configures a network bridge for Network Manager enabling you to create VMs on a network that is:
+    * Routed to the LAN
+    * Bridged to the LAN so the VM appears directly on the LAN
+* Assigns the optional specified  user to the `libvirt` group. This can also be done later with
+```
+sudo usermod -a -G libvirt a_user
+sudo usermod -a -G libvirt-qemu a_user
+```
+
+* Creates a few scripts in /usr/local/sdm/kvm that you may find useful/handy. See <a href="kvm-virtualization.md">getting started with kvm virtualization</a> for details.
+
+#### Arguments
+
+* `gui` &mdash; Also install the virt-manager GUI
+* `ifname` &mdash; Network interface to use for the bridge [D:eth0]
+* `user` &mdash; Username to be added to the `libvirt` and `libvirt-qemu` groups
+
+#### Examples
+
+* `--plugin kvm:"gui|user=myuser"` &mdash; Install virtualization; add `myuser` to the `libvirt` and `libvirt-qemu` groups, Also install virt-manager GUI
+
 ### L10n
 
 Use the `L10n` plugin to set the localization parameters: `keymap`, `locale`, and `timezone`. You can find the valid values for these arguments with
@@ -708,6 +793,24 @@ The best way to use this plugin is:
 * `--plugin labwc:"app-config=libfm:/path/to/libfm.conf,pcmanfm=/path/to/pcmanfm.conf,lxterminal=/path/to/lxterminal.conf"`
 * `--plugin labwc:"lhmouse|user=someuser"`
 * `--plugin labwc:"labwc-config=autostart:/path/to/autostart,environment=/path/to/environment"`
+
+### ln
+
+The `ln` plugin creates a link, either hard or symbolic.
+
+#### Arguments
+
+linkname &mdash; The linkname that will be created
+symbolic &mdash; Make a symbolic link. If not specified, a hard link will be created
+target &mdash; The target of the link. If creating a hard link, the target file must exist
+
+#### Examples
+
+* `--plugin ln:"target=/usr/bin/less|linkname=/usr/bin/lessismore"` &mdash; Create a hard link to target /usr/bin/less with name /usr/bin/lessismore
+* `--plugin ln:"symbolic|target=/nfs/server1/data/org1|linkname=/org1"` &mdash; Create a symbolic link /org1 that links to an nfs-mounted disk
+
+Notes
+* Although the link will always be created by root, a non-privileged user can remove a link from a directory with write access to the directory.
 
 ### logwatch
 
@@ -954,6 +1057,18 @@ Installs pi-apps (https://github.com/Botspot/pi-apps). That's it!
 
 * `--plugin piapps:"user=bls"` &mdash; Install piapps for user bls. The user was already created with the `user` plugin
 
+### pihole
+
+Install Pi-hole. This plugin requires that you first install Pi-hole manually and save off the /etc/pihole/pihole.toml file. You then feed that toml file to this plugin. You can hand-edit the file to update it as appropriate for your configuration.
+
+#### Arguments
+
+* **toml** &mdash; /path/on/host/to/your-pihole.toml. This file is loaded into the IMG and Pi-hole uses it for configuration.
+
+#### Examples
+
+* `--plugin pihole:toml=/path/to/my-pihole.toml`
+
 ### pistrong
 
 <a href="https://github.com/gitbls/pistrong">pistrong</a> installs the strongSwan IPSEC VPN server and `pistrong`. pistrong provides
@@ -1107,15 +1222,33 @@ The `runatboot` plugin provides a way to run an arbitrary script during the Firs
 * **output** &mdash; Where to set stdout. Default is /dev/null. The directory must already exist, and the user (root or `user` if specified) must be able to write the output file in that directory
 * **error** &mdash; Where to set stderr. Default is the same as stdout (`2>&1`)
 
-#### Example
+#### Examples
 
 * `--plugin runatboot:"script=/path/to/script|args=arg1 arg2 arg3"` &mdash; Run the specified script with the 3 provided arguments
 * `--plugin runatboot:"user=me|sudoswitches=-H|script=/path/to/script|args=arg1 arg2 arg3"` &mdash; Run the specified script with the 3 provided arguments as the specified user and include `-H` on the sudo command
 * `--plugin runatboot:"script=/path/to/script2|args=arg1 arg2 arg3|output=/var/log/myscript.log"` &mdash; Run the specified script with the 3 provided arguments with output and error going to /var/log/myscript.log
 
+### runcommand
+
+The `runcommand` plugin runs a bash command during customization or burning.
+
+#### Arguments
+
+* **dir** &mdash; Optional directory in which to run the command (as the default directory). The directory will be created if it doesn't exist. Use a /full/path/to/dir
+* **runphase** &mdash; Specifies the phase (`1` or `post-install`) in which to run the script. Default is `1`
+* **command** &mdash; The command to run
+* **user** &mdash; The user under which to run the script. The user must exist by the time the script is run in Phase 1 or post-install. If not specified the script is run as `root`. If `user` is not `root`, then you must specify the `dir` argument or the plugin will be unable to write the output and error files.
+* **stdout** &mdash; Specifies stdout for the script output. /full/path/to/stdout must be specified (but not checked by sdm)
+* **stderr** &mdash; Specifies stderr for the script output. /full/path/to/stderr must be specified (but not checked by sdm)
+
+#### Examples
+
+* `--plugin runcommand:"command=ls -lR /bin|stdout=/root/ls.out|stderr=/root/ls.error"` &mdash; Run the provided command `ls -lR /bin` as root. The stdout and stderr files will be written to the specified files.
+* `--plugin runcommand:"command=/usr/local/bin/myscript|dir=/home/myuser|user=myuser"` &mdash; Run the specified command as the user `myuser`. stdout and stderr files will be written to /home/myuser.
+
 ### runscript
 
-The `runscript` plugin runs a script during customization.
+The `runscript` plugin runs a script during customization or burning
 
 #### Arguments
 
@@ -1388,7 +1521,9 @@ If the system plugin is invoked more than once in an IMG, either on customize or
 * **rclocal** &mdash; Comma-separated list of ordered commands to add to /etc/rc.local. An item starting with '@' is interpeted as a file whose contents will be included.
 * Service control arguments
   * **service-disable** &mdash; Comma-separated list of services to disable
+  * **service-disable-at-boot** &mdash; Comma-separated list of services to disable at first boot
   * **service-enable** &mdash; Comma-separated list of services to enable
+  * **service-enable-at-boot** &mdash; Comma-separated list of services to enable at first boot
   * **service-mask** &mdash; Comma-separated list of services to mask
 * **swap** &mdash; **disable** or integer swapsize in MB to set
 * **sysctl** &mdash; Comma-separated list of files to copy to /etc/sysctl.d
@@ -1407,6 +1542,12 @@ If you're having issues with settings in your `systemd-config` files, here are s
 * The command `sudo systemd-analyze cat-config systemd/service.conf` (where *service* is one of journald, logind, networkd, pstore, sleep, system, timesyncd, or user) will display the settings in precedence order. This is very handy in sorting out what config file is providing which setting.
 * The files in /lib/systemd/*service*.conf.d and /etc/systemd/*service*.conf.d appear to have their files unified and processed in ascending alphabetical order. For instance,with /lib/systemd/journal.conf.d/70-xx.conf and /etc/systemd/journal.conf.d/030-xx.conf, 030-xx.conf is processed *first*, so any settings in 70-xx.conf will override settings in 030-xx.conf. 
 * The `swap` argument controls whichever of `rpi-swap` or `dphys-swapfile` is installed. `swap=0` disables swap. Also see the `swap` plugin for fine-grained configuration of `rpi-swap`.
+* The `service-disable` and `service-enable` arguments operate immediately on the specified services, whereas the `service-disable-at-boot` and `service-enable-at-boot` arguments operation is delayed and performed during sdm FirstBoot.
+
+
+  For instance, if a service is dependent on other operations that must be completed at boot time, you can use `service-disable` during customization to disable the service, and use `service-enable-at-boot`. In this scenario the service will run for the first time on the reboot AFTER sdm FirstBoot has completed.
+
+  Similarly, if you only want a service to run on the very first system boot BEFORE sdm FirstBoot completes, use `service-enable` to enable it during customization, and `service-disable-at-boot` to disable it for all subsequent system boots.
 
 ### trim-enable
 
@@ -1434,7 +1575,7 @@ Install and configure the ufw firewall
 
 #### Examples
 
-* `--plugin ufw:"/ufwscript=/path/to/script1,/path/to/script2"` &mdash; Install ufw and configure it with the two provided script files. Save the script files in the IMG in /usr/local/bin
+* `--plugin ufw:"ufwscript=/path/to/script1,/path/to/script2"` &mdash; Install ufw and configure it with the two provided script files. Save the script files in the IMG in /usr/local/bin
 * `--plugin ufw` &mdash; Install ufw, do not configure any rules. ufw documentation says that all inbound network accesses are denied by default
 
 ### update-alternatives
@@ -1720,6 +1861,29 @@ Note that wsdd is available in Bookworm via apt, so this plugin is not needed on
 
 * **wsddswitches=switchlist** &mdash; List of switches to write into /etc/default/wsdd
 * **localsrc=/path/to/files** &mdash; Local directory with cached copy of wsdd (files: wsdd.py wsdd.8 wsdd.defaults wsdd.service)
+
+### x11
+
+The `x11` plugin installs the core X11 packages, and optionally installs a Display Manager, and Window Manager.
+
+#### Arguments
+
+* **apps=*list,of,packages*** &mdash; List of additional packages to install
+* **dm=*displaymanager*** &mdash; Name of display manager package. Known display managers include `lightdm`, `wdm`, and `xdm`, but this is not checked
+* **fonts=*list,of,font,packages*** &mdash; List of X11 font packages to install in addition to the default font packages (`xfonts-base,xfonts-100dpi,xfonts-75dpi,xfonts-scalable`)
+* **nodmconsole** &mdash; Do not enable the display manager on the system console
+* **noglamor** &mdash; Do not install `glamor-test`, needed on Pi5 for proper X11 operation; literally no impact on other Pis
+* **wm=*windowmanager*** &mdash; name of window manager package. There are many to choose from!
+
+#### Notes
+
+* If either `dm` or `wm` is not specified, `nodmconsole` will be set.
+* The x11 plugin ensures a non-graphical console mode for FirstBoot if a known display manager (`lightdm`, `wdm`, and `xdm`) is installed, and then enables graphical console (if requested), providing more visbility into the first boot process.
+* The x11 plugin does not do any special configuration for any display manager beyond delaying the graphical console to after Firstboot for `lightdm`, `wdm`, and `xdm`. Both wdm and xdm *just work*. It appears that furher `lightdm` configuration is required beyond the basic install, and is not provided by this plugin.
+
+#### Examples
+
+* `--plugin x11:"dm=xdm|wm=icewm" &mdash; Install X11 with the default set of fonts with the xdm display manager and icewm window manager.
 
 <br>
 <form>

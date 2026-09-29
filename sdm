@@ -125,7 +125,7 @@ function loadsdm() {
     cp -a $src/sdm-readparams $SDMPT/etc/sdm
     if [ -f $src/completion.sdm ]
     then
-	mkdir -p /etc/bash_completion.d
+	mkdir -p $SDMPT/etc/bash_completion.d
 	cp $src/completion.sdm $SDMPT/etc/bash_completion.d/sdm
     fi
     setfileownmode $SDMPT/etc/sdm/sdm-readparams 755
@@ -221,9 +221,6 @@ Command Switches for --customize and --burn or as noted
  --burn-plugin pname:\"args\" Run burn plugin pname post-burn with the specified args (separate args with '|')
  --chroot            Use chroot rather than systemd-nspawn (for use on certain host OSes)
  --convert-root fmt  Use the specified rootfs format (btrfs, lvm) instead of ext4
- --encrypted         The rootfs is encrypted and must be decrypted by sdm
- --expand-at-boot    rootfs expansion done at boot (Trixie and later)
- --extract-log dir   Extract the sdm history and apt.log to the named directory
  --cscript script    Custom Phase Configuration script
  --csrc dir          Source directory passed for Custom Phase scripts
  --custom[1-4] str   Can be used in Custom cscripts
@@ -233,8 +230,11 @@ Command Switches for --customize and --burn or as noted
  --directory         sd-image-file is a directory tree rather than an IMG
  --domain name       Domain name (for use in Custom Phase Script; sdm does not use)
  --ecolors fg:bg:cur Set fg/bg/cursor colors when operating in the mounted IMG
+ --encrypted         The rootfs is encrypted and must be decrypted by sdm
+ --expand-at-boot    rootfs expansion done at boot
  --expand-root       Expand the root partition after burning it to a device
  --extend            Extend the image by --xmb N MB [Default: 2048/2GB]
+ --extract-log dir   Extract the sdm history and apt.log to the named directory
  --gpt               Create GPT partition table (instead of MBR). Use with --burn
  --groups list,of,groups Use this list of groups as the default for the user plugin
  --host hostname     Hostname to write onto the storage device with --burn
@@ -267,7 +267,7 @@ Command Switches for --customize and --burn or as noted
 # Initialize and Parse the command
 #
 #
-version="V15.2"
+version="V15.8"
 aptcache=""                 #IP address of apt-cacher-ng server
 aptdistupgrade=0            #1=Use apt-get dist-upgrade instead of upgrade
 aptmaint=""                 #--aptmaint switch values
@@ -287,6 +287,7 @@ csrc=""                     #Source directory for use by Custom Phase script
 cscript=""                  #Custom Phase script
 cvtrootext=""               #With --convert-root set rootfs to this size or increase by this amount (with '+')
 cvtrootfs=""                #--convert-root
+cvtrootmountoptions=""      #--convert-root-mount-options
 datefmt="%Y-%m-%d %H:%M:%S" #Default date format for history log
 ddpid=""                    #Holds pid of dd during IMG Extend
 ddextend=0                  #1=use dd for extend instead of qemu-img
@@ -347,7 +348,7 @@ runonly=""                  #Keyword specified for --runonly
 drebootwait=$rebootwait     # Used to see if rebootwait should be modified on burn
 redocustomize=0             #1=Don't prompt if image already customized
 sdmdir="/usr/local/sdm"     #Where to put sdm when customizing. --sdmdir to change
-sdmflist="sdm sdm-phase0 sdm-phase1 sdm-cparse sdm-readparams sdm-cmdsubs sdm-rpcsubs sdm-spawn sdm-cryptconfig sdmcryptfs sdm-firstboot sdm-apt sdm-apt-cacher sdm-cportal sdm-logmsg sdm-gburn sdm-add-luks-key sdm-make-luks-usb-key sdm-collect-labwc-config"
+sdmflist="sdm sdm-phase0 sdm-phase1 sdm-cparse sdm-readparams sdm-cmdsubs sdm-rpcsubs sdm-spawn sdm-cryptconfig sdmcryptfs sdm-firstboot sdm-apt sdm-apt-cacher sdm-cportal sdm-logmsg sdm-gburn sdm-add-luks-key sdm-make-luks-usb-key sdm-collect-labwc-config ezsdm"
 vaptmaintops="|update|upgrade|autoremove|" #Options for --apt
 virtmode="nspawn"           #"nspawn" or "chroot"
 vcvtrootfs="|btrfs|ext4|lvm|" #Valid --convert-root settings
@@ -373,13 +374,46 @@ source $src/sdm-cparse           # Get function defs
 #
 cmdline="$0 $*"
 longopts="help,1piboot:,aptcache:,apt-dist-upgrade,aptmaint:,apt-options:,\
-autologin,b0script:,b1script:,batch,bootscripts,burn:,burnfile:,burn-plugin:,chroot,cscript:,convert-root:,csrc:,\
+autologin,b0script:,b1script:,batch,bootscripts,burn:,burnfile:,burn-plugin:,chroot,cscript:,convert-root:,convert-root-mount-options:,csrc:,\
 customize,datefmt:,ddextend,ddsw:,debug:,directory,domain:,ecolors:,encrypted,explore,expand-at-boot,expand-root,extend,\
 extract-log:,extract-logs:,extract-script:,gpt,groups:,host:,hostname:,info,keyfile:,loadlocal:,logwidth:,\
 mcolors:,mount,no-expand-root,norestart,noreboot,nowait-timesync,nspawnsw:,oklive,os:,plugin-debug,\
 plugin:,plugins:,poptions:,ppart,reboot:,redact,redo-customize,\
 regen-ssh-host-keys,restart,runonly:,sdmdir:,sdmprep,showapt,shrink,\
 bupdate:,xmb:,custom1:,custom2:,custom3:,custom4:,version"
+
+case "$1" in
+# TODO: mv|chown|chmod (chown needs to be done in container)
+    cat|cleanup|df|get|journalctl|jc|jca|jcall|less|list-boots|ls|put|rm|rmdir|run)
+	extcmd=$1
+	shift 1
+	source $src/sdm-cmdsubs
+	beroot "$cmdline"
+	sdm_do_ext_command "$extcmd" "$*"
+	exit
+	;;
+    burn)
+	burn=1 ; burndev=$2 ; shift 2
+	;;
+    customize)
+	fcustomize=1 ; shift 1
+	;;
+    explore)
+	fexplore=1 ; shift 1
+	;;
+    extend)
+	fextend=1 ; shift 1
+	;;
+    info)
+	infocmd=1 ; shift 1
+	;;
+    mount)
+	fdomount=1 ; shift 1
+	;;
+    shrink)
+	fshrink=1 ; shift 1
+	;;
+esac
 
 OARGS=$(getopt -o h --longoptions $longopts -n 'sdm' -- "$@")
 [ $? -ne 0 ] && errexit "? $0: Unable to parse command"
@@ -388,7 +422,7 @@ eval set -- "$OARGS"
 while true
 do
     case "${1,,}" in
-	# 'shift 2' if switch has argument, else just 'shift'
+	# 'shift 2' if switch has argument, else 'shift 1'
 	--1piboot)     pi1bootconf=$2; shift 2 ;;
 	--aptcache)    aptcache=$2   ; shift 2 ;;
 	--apt-dist-upgrade) aptdistupgrade=1 ; shift 1 ;;
@@ -405,6 +439,7 @@ do
 	--burn-plugin) burnplugins=$(appendvalue "$burnplugins" "$2" "~") ; shift 2 ;;
 	--chroot)      fchroot=1     ; shift 1 ;;
 	--convert-root) cvtrootfs="${2,,}" ; shift 2 ;;
+	--convert-root-mount-options) cvtrootmountoptions="$2" ; shift 2 ;;
 	--cscript)     cscript=$2    ; shift 2 ;;
 	--csrc)        csrc=$2       ; shift 2 ;;
 	--customize)   fcustomize=1  ; shift 1 ;;
@@ -514,12 +549,7 @@ Keys can be abbreviated to 'time', 'local', 'key', and 'wifi'"
 exit 0
 fi
 [ "${dimg,,}" == "help" ] && printhelp && exit
-if [ $EUID -ne 0 ]
-then
-    echo "% Re-running sdm with 'sudo $cmdline'"
-    sudo $cmdline
-    exit
-fi
+beroot "$cmdline"
 declare -a cmsgs                    # In case customization messages generated before we're ready to logtoboth them
 cscript="$(fndotfullpath $cscript)"
 [[ $burn -eq 1 ]] && [[ $burnfile -eq 1 ]] && errexit "? Switch conflict: --burn and --burnfile"
@@ -564,7 +594,7 @@ then
 	then
 	    fextendonly=1
 	else
-	    errexit "? No command specified (--aptmaint --burn, --customize, --explore, --help, --mount, --runonly, , --sdmprep, --version)"
+	    errexit "? No command specified (--aptmaint --burn, --customize, --explore, --help, --mount, --runonly, --sdmprep, --version)"
 	fi
     fi
 fi
@@ -741,10 +771,6 @@ thishost="$(hostname)"
 #
 if [ $burning -eq 1 ]
 then
-    if iswsl
-    then
-	 [ $burnfile -eq 0 ] && errexit "? sdm burn not supported on Windows WSL"
-    fi
     case "$cvtrootfs" in
 	btrfs)
 	    [ "$(type -p btrfs)" == "" ] && errexit "? Cannot find btrfs; Do 'sudo apt install btrfs-progs' and then rerun sdm"

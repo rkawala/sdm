@@ -99,8 +99,8 @@ function bootlogx() {
 function write_console() {
     #
     # $1 string to write
-    # Written to /dev/console as "\n$(thisdate) sdm FirstBoot: $1"
-    echo -e "\n$(thisdate) sdm FirstBoot: $1" > /dev/console
+    # Written to /dev/console as "$(thisdate) sdm FirstBoot: $1"
+    echo -e "$(thisdate) sdm FirstBoot: $1" > /dev/console
 }
 
 function write_console0() {
@@ -163,6 +163,16 @@ function extractlogs() {
     then
 	[ -f $extractscript ] || logtobothex "? Cannot find extract script '$extractscript'"
 	$extractscript
+    fi
+}
+
+function beroot() {
+    cmdline="$1"
+    if [ $EUID -ne 0 ]
+    then
+	echo "% Re-running sdm with 'sudo $cmdline'"
+	exec sudo $cmdline
+	exit
     fi
 }
 
@@ -480,17 +490,17 @@ function loginfo() {
     [ "$memsize" != "" ] && $logsub "   Memory:    $memsize" "" "$mods"
     $logsub "   uname:     $(uname -a)" "" "nosplit${mods}"
     [ "$pimodel" != "" ] && $logsub "   Raspberry Pi Model: $pimodel" "" "$mods"
-    os_name="$(getosinfo PRETTY_NAME)"
-    [ "$os_name" == "" ] && os_name="$(getosinfo NAME)"
+    os_name="$(getosinfo PRETTY_NAME $SDMPT)"
+    [ "$os_name" == "" ] && os_name="$(getosinfo NAME $SDMPT)"
     $logsub "   os-release Name: $os_name" "" "$mods"
-    os_version="$(getosinfo VERSION)"
-    os_codename="$(getosinfo VERSION_CODENAME)"
+    os_version="$(getosinfo VERSION $SDMPT)"
+    os_codename="$(getosinfo VERSION_CODENAME $SDMPT)"
     if [ "$os_codename" != "" ]
     then
 	[[ "$os_version" =~ $os_codename ]] || os_version="$os_version ($os_codename)"
     fi
     $logsub "   Version: $os_version" "" "$mods"
-    os_like="$(getosinfo ID_LIKE)"
+    os_like="$(getosinfo ID_LIKE $SDMPT)"
     [ "$os_like" != "" ] && $logsub "   Like OS: $os_like" "" "$mods"
     $logsub "   sdm Version: $version" "" "$mods"
     $logsub "* IMG Information" "" "$mods"
@@ -846,8 +856,8 @@ function runplugins_exit() {
 function add_defer_plugin() {
     local plugin="$1"
 
-    mkdir -p $SDMPT/etc/sdm/assets/defer-pluglist
-    echo "$plugin" >> $SDMPT/etc/sdm/assets/defer-pluglist/defer-pluglist
+    mkdir -p $SDMPT/etc/sdm/assets/defer-plugin
+    echo "$plugin" >> $SDMPT/etc/sdm/assets/defer-plugin/defer-pluglist
 }
 
 function live0scripts() {
@@ -1496,6 +1506,7 @@ function sdm_spawn() {
 	declare -x OLDSDMNSPAWN="$SDMNSPAWN"
 	#
 	# If there is no /etc/resolv.conf, fabricate one
+	[ -L $SDMPT/etc/resolv.conf ] && rm -f $SDMPT/etc/resolv.conf
 	[ -f $SDMPT/etc/resolv.conf ] || printf "# sdm-generated \nnameserver 1.1.1.1\n" > $SDMPT/etc/resolv.conf
 	trap "ctrlchroot" SIGINT
 	for fs in dev dev/pts proc sys ; do mount --bind /$fs $SDMPT/$fs ; done
@@ -1988,9 +1999,10 @@ function domount() {
     # $2: "Directory" "IMG" or "Device"
     # $3: mount point (D:$SDMPT)
     # $4: fstype
+    # $5: mount options (optional, e.g. "compress=zstd,noatime")
     # Tree will be mounted on the mountpoint, which must be set with makemtpt or makemtptX
     #
-    local dmimg=$1 imgtype=$2 mpoint=${3} fstype=$4
+    local dmimg=$1 imgtype=$2 mpoint=${3} fstype=$4 mopts=$5
     local p1="1" p2="2" pinfo csize bootstart bootsize rootstart rootsize mdir sts rootfsd lv=0 kf=""
 
     [ "$mpoint" == "" ] && mpoint=$SDMPT
@@ -2072,7 +2084,7 @@ function domount() {
 	    else
 		if [ "$fstype" != "zfs" ]
 		then
-		    mount -v ${dmimg}${p2} $mpoint
+		    mount -v ${mopts:+-o $mopts} ${dmimg}${p2} $mpoint
 		else
 		    zfs mount rpool/ROOT/debian
 		fi
@@ -2128,6 +2140,18 @@ function docleanup() {
 	unset SDMPX
     fi
     sync
+}
+
+function partprobe_wait() {
+    local dev=$1 nwait=20
+ 
+    for (( il=1 ; il<$nwait ; il++ ))
+    do
+        partprobe $1 2>/dev/null
+        [ -b $dev ] && return 0
+        sleep 0.25
+    done
+    return 1
 }
 
 function lvmfind() {
@@ -2195,13 +2219,13 @@ function delaydmenable() {
     # Disable the display manager in $1 and set for re-enable during First Boot
     # $2=delayed target (either B3 or B4)
     #
-    local dm="$1" bbh="$(getfinalbbh $2)"
+    local dm="$1" bbh="$2"
+    setdelayedbbh $bbh
     logtoboth "% Plugin $pfx: Display Manager '$dm' will be disabled when the system first boots"
     logtoboth "  The sdm FirstBoot process will re-enable it with boot_behavior '$bbh'"
     #SUDO_USER="$userx" raspi-config do_boot_behaviour B1 nonint > /dev/null 2>&1
     do_raspiconfig do_boot_behaviour B1
-    systemctl set-default multi-user.target > /dev/null 2>&1
-    setdelayedbbh $bbh
+    systemctl --quiet set-default multi-user.target
 }
 
 function delaylightdmenable() {
@@ -2213,18 +2237,19 @@ function delaylightdmenable() {
     do_raspiconfig do_boot_behaviour B1
     systemctl set-default multi-user.target > /dev/null 2>&1
     [ $autologin -eq 1 ] && bbh="B4" || bbh="B3"
-    aval=$(getfinalbbh "$bbh")
-    if [ "$bbh" != "$aval" ]
-    then
-	logtoboth "% Plugin $pfx: Display Manager lightdm default boot behavior overridden by explicit setting '$aval'"
-    else
-	logtoboth "% Plugin $pfx: Desktop Autologin setting '$bbh' will be set after sdm FirstBoot"
-	setdelayedbbh $bbh
-    fi
+    setdelayedbbh $bbh
+    logtoboth "% Plugin $pfx: Desktop Autologin setting '$bbh' will be set after sdm FirstBoot"
+    #aval=$(getfinalbbh "$bbh")
+    #if [ "$bbh" != "$aval" ]
+    #then
+	#logtoboth "% Plugin $pfx: Display Manager lightdm default boot behavior overridden by explicit setting '$aval'"
+    #else
+    #fi
 }
 
 function gfxcfgpostinstall() {
 
+    local nodmconsole=$1
     if [ -d /etc/lightdm ]
     then
 	logtoboth "> Plugin $pfx: Found Display Manager lightdm"
@@ -2241,19 +2266,19 @@ function gfxcfgpostinstall() {
 	bbhandled=1
 	# VV This overrides default LISTEN * ; 127.0.0.1 disables xdmcp finder, finder enabled with 0.0.0.0. By default xdmcp finder is enabled
 	#echo "LISTEN 0.0.0.0" >> /etc/X11/xdm/Xaccess
-	logtoboth "> Plugin $pfx: Update xdm.service so it can be enabled with systemctl"
-	cp /lib/systemd/system/xdm.service /etc/systemd/system
-	cat >> /etc/systemd/system/xdm.service <<EOF
-
-[Install]
-WantedBy=multi-user.target
-EOF
-	if [ $nodmconsole -eq 1 ]
+	#logtoboth "> Plugin $pfx: Update xdm.service so it can be enabled with systemctl"
+	#cp /lib/systemd/system/xdm.service /etc/systemd/system
+	#cat >> /etc/systemd/system/xdm.service <<EOF
+#
+#[Install]
+#WantedBy=multi-user.target
+#EOF
+	if [ "$nodmconsole" == "yes" ]
 	then
 	    logtoboth "> Plugin $pfx: Disable xdm on console"
 	    sed -i "s/\:0 local \/usr\/bin\/X :0 vt7 -nolisten tcp/\#\:0 local \/usr\/bin\/X :0 vt7 -nolisten tcp/"  /etc/X11/xdm/Xservers
 	    [ -f /etc/sdm/0piboot/040-realvnc-server.sh ] && mv -f /etc/sdm/0piboot/040-realvnc-server.sh /etc/sdm/0piboot/.040-realvnc-server.sh
-	    systemctl set-default multi-user.target
+	    systemctl --quiet set-default multi-user.target
 	    delaydmenable xdm B1
 	else
 	    delaydmenable xdm B3
@@ -2266,13 +2291,13 @@ EOF
     then
 	logtoboth "> Plugin $pfx: Found Display Manager wdm"
 	bbhandled=1
-	if [ $nodmconsole -eq 1 ]
+	if [ "$nodmconsole" == "yes" ]
 	then
 	    logtoboth "> Plugin $pfx: Disable wdm on console"
 	    sed -i "s/\:0 local \/usr\/bin\/X :0 vt7 -nolisten tcp/\#\:0 local \/usr\/bin\/X :0 vt7 -nolisten tcp/"  /etc/X11/wdm/Xservers
 	    # RealVNC server operation with wdm unknown, so disable RealVNC 
 	    [ -f /etc/sdm/0piboot/040-realvnc-server.sh ] && mv -f /etc/sdm/0piboot/040-realvnc-server.sh /etc/sdm/0piboot/.040-realvnc-server.sh
-	    systemctl set-default multi-user.target
+	    systemctl --quiet set-default multi-user.target
 	    delaydmenable xdm B1
 	else
 	    delaydmenable wdm B3
@@ -2281,7 +2306,7 @@ EOF
     #
     # If Lite and no known display manager found set to console no login
     #
-    if [ ! -d /etc/lightdm -a $bbhandled -eq 0 ]
+    if [[ ! -d /etc/lightdm ]] && [[ $bbhandled -eq 0 ]]
     then
 	# Lite with no known Desktop
 	if [ $reboot -eq 1 ]

@@ -1,5 +1,72 @@
 # Changelog
 
+## V15.8
+
+* New Features
+* Improvements
+  * Disk encryption crypto `xchacha` now defaults to `xchacha12`. Other options are `aes`, `xchacha12`, or `xchacha20`
+  * Logging and control flow improvements in sdm-cryptconfig
+  * `disables` plugin `cloudinit` also masks the service to prevent apt updating it
+  * `raspiconfig` plugin `boot_behavior` setting properly defaults to `autologin` for B2 and B4
+  * `x11` plugin argument `noglamor` prevents installing the `gldriver-test` package
+* Bug Fixes
+  * Correct operation of `defer-plugin` to properly clean up in all cases
+  * Correct broken and improve error handling in sdmcryptfs
+
+## V15.7
+
+* New Features
+  * `kvm` plugin to virtualization See <a href="Docs/kvm-virtualization.md">Getting started with kvm virtualization RasPiOS</a> and <a href="Docs/Plugins.md#kvm">kvm plugin documentation</a>
+* Improvements
+* Bug Fixes
+  * Correct dyslexic redirections
+
+## V15.6
+
+* New Features
+  * New `x11` plugin to install X11 on Lite (IMG type not checked!)
+  * `videomode` argument added to `system` plugin; `graphics` plugin is deprecated and will be removed in the future
+  * `pihole` plugin to install piHole
+* Improvements
+  * Ensure `fdisk` package is installed; for hosts where it's not installed by default
+* Bug Fixes
+  * Update `labwc` plugin and `sdm-collect-labwc-config` for Trixie
+  * Correct `bootconfig` plugin handling of `inline` to correctly replace an existing line
+
+## V15.5
+
+* New Features
+  * New sdm Disk and Image management convenience commands. See <a href="Docs/Image-Management-Commands.md">Image and Disk Management Commands</a>
+* Improvements
+  * `cryptpart` plugin now supports Network Bound Disk Encryption. See <a href="Docs/Disk-Encryption.md#nbde-and-cryptpart">NBDE and cryptpart</a>.
+  * Burn plugin `btrfs-config` appropriately configures btrfs subvolumes. Thanks @jokester
+  * Eliminate sdm firstboot extra blank lines on console output
+* Bug Fixes
+
+## V15.4
+
+* New Features
+  * sdm can write disks on Windows WSL2 instances if `usbipd` is installed. Details <a href="Docs/Using-sdm-on-Windows-WSL.md">here</a>. Thanks @Pooky-s.
+  * sdm simplifies creating and maintaining an updated golden RasPiOS IMG
+  * rootfs Disk Encryption
+    * Enable Network Bound Disk Encryption (NBDE) using tang/clevis <a href="Docs/Disk-Encryption.md">Details here</a>. Thanks @Handrail9 for the suggestion.
+    * Disk encryption process can be fully automated <a href="Docs/Disk-Encryption.md">Details here</a>.
+* Improvements
+  * Deferred plugins service changed to a forking service to not block startup complete
+  * Enhance documentation for `--plugin system:service-*able-at-boot` to explain how they can be used
+  * Bash completion, if enabled, can list available plugins for the `--plugin` switch
+* Bug Fixes
+
+## V15.3
+
+* New Features
+  * `cryptpart` plugin can wire up an already-encrypted partition with the `nocreate` argument
+  * `ln` plugin to create a hard link or symbolic link
+* Improvements
+  * `defer-plugin` plugin can run a command and/or reboot system at completion of deferred operations
+  * `system` plugin argument `swap` and `zram` can configure the FixedSize for these on the Trixie zram configuration
+* Bug Fixes
+
 ## V15.2
 
 * New Features

@@ -97,13 +97,11 @@ then
 		apt-upgrade)
 		    if ! [[ "$poptions" =~ "noupgrade" ]]
 		    then
-			adjust_initramfs_all
 			[ $aptdistupgrade -eq 0 ] && upg="upgrade" || upg="dist-upgrade"
 			logtoboth "> Start 'apt $upg'"
 			logfreespace "at start of 'apt $upg'"
 			upgkeepconf "-y" "$showapt" $aptdistupgrade
 			logfreespace "at end of 'apt $upg'"
-			unadjust_initramfs_all
 		    else
 			logtoboth "> Skip 'apt upgrade' per --apt-options noupgrade"
 		    fi    
@@ -180,11 +178,11 @@ EOF
 ConditionPathExists=!/etc/sdm/control/sdm-startup
 ConditionPathExists=!/etc/sdm/control/rootfs-encryption
 ConditionPathExists=!/etc/sdm/control/no-defer-pluglist
-After=multi-user.target network-online.target
+After=network-online.target
 Wants=network-online.target
 
 [Service]
-Type=oneshot
+Type=forking
 RemainAfterExit=yes
 ExecStart=/usr/local/bin/sdm-run-defer-pluglists
 TimeoutStopSec=300
@@ -198,9 +196,22 @@ EOF
 #
 # Process apps plugin deferred app installs
 #
-source /etc/sdm/sdm-readparams
 
-assetdir=/etc/sdm/assets/defer-pluglist
+function defer_cleanup() {
+    logtoboth "* Dot-hide /etc/systemd/system/sdm-defer-pluglist.service and /usr/local/bin/sdm-run-defer-pluglists"
+    systemctl disable sdm-defer-pluglist
+    mv /etc/systemd/system/sdm-defer-pluglist.service /etc/systemd/system/.sdm-defer-pluglist.service
+    mv /usr/local/bin/sdm-run-defer-pluglists /usr/local/bin/.sdm-run-defer-pluglists
+}
+
+if [ "$1" == "" ]
+then
+    $0 "fork" &         # Fork and restart myself so forking service is started
+    exit
+fi
+
+source /etc/sdm/sdm-readparams
+assetdir=/etc/sdm/assets/defer-plugin
 
 if [ -f $assetdir/defer-pluglist ]
 then
@@ -208,9 +219,32 @@ then
     sdm --runonly plugins --oklive --logwidth 256 --plugin @$assetdir/defer-pluglist
     logtoboth "* Complete Run Defer Pluglists"
 fi
-logtoboth "* Dot-hide /etc/systemd/system/sdm-defer-pluglist.service and /usr/local/bin/sdm-run-defer-pluglists"
-mv /etc/systemd/system/sdm-defer-pluglist.service /etc/systemd/system/.sdm-defer-pluglist.service
-mv /usr/local/bin/sdm-run-defer-pluglists /usr/local/bin/.sdm-run-defer-pluglists
+if [ -f $assetdir/defer-done-options ]
+then
+    while read line
+    do
+        logtoboth "> Found Command '$line'"
+	IFS=":=" read command value <<< "$line"
+        case "$command" in
+            defer-command)
+                logtoboth "* Run Defer Command '$value'"
+                $value
+                [ $? -ne 0 ] && logtoboth "% Command '$value' returned error ($?)"
+                ;;
+            defer-reboot)
+                value=${value:-5}
+                logtoboth "* Reboot in $value seconds after Defer Pluglist completion"
+                logger "Rebooting system in $value seconds per 'defer-reboot'"
+                sleep $value
+		defer_cleanup
+                reboot
+                ;;
+        esac
+    done < $assetdir/defer-done-options
+    defer_cleanup
+    exit 0
+fi
+defer_cleanup
 exit 0
 EOF
 		    chmod 755 /usr/local/bin/sdm-run-defer-pluglists
@@ -220,12 +254,10 @@ EOF
 		    # Complete graphics post-install if graphics plugin not selected
 		    # This is a hack. Proper fix needs more thought
 		    #
-		    if ! ispluginselected graphics "$plugins~$allplugins"
+		    if ! ispluginselected graphics "$plugins~$allplugins" && ! ispluginselected x11 "$plugins~$allplugins"
 		    then
-			logtoboth "> Run graphics post-install configuration"
-			gargs=$(getpluginargs graphics "$plugins")
-			[[ "$gargs" =~ "nodmconsole" ]] && nodmconsole=1 || nodmconsole=0
-			gfxcfgpostinstall yes
+			logtoboth "> Run delayed display manager configuration check"
+			gfxcfgpostinstall no
 		    fi
 		    ;;
 		pre-phase1)

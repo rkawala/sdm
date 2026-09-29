@@ -5,6 +5,7 @@
 <br><a href="Burn-Scripts.md">Burn Scripts</a>
 <br><a href="Captive-Portal.md">Captive Portal</a>
 <br><a href="Command-Details.md">Detailed command and switches description</a>
+<br><a href="Image-Management-Commands.md">Image and Disk management convenience commands</a>
 <br><a href="Cool-Things-You-Can-Do-with-sdm.md">Cool and useful things you can do with sdm</a>
 <br><a href="Cool-Things-You-Can-Do-Hotspot.md">Cool and useful things: Hotspot</a>
 <br><a href="Cool-Things-You-Can-Do-SSHkey.md">Cool and useful things: User-specific unique SSH key</a>
@@ -30,6 +31,7 @@
 <br><a href="Hotspot.md">Hotspot</a>
 <br><a href="Detailed-Installation-Guide.md">Installing and Removing sdm</a>
 <br><a href="Known-Issues.md">Known Issues</a>
+<br><a href="kvm-virtualization.md">Run VMs with KVM virtualization</a>
 <br><a href="Operating-Details.md">Operating Details</a>
 <br><a href="Passwords.md">Passwords</a>
 <br><a href="Performance-How-Fast-is-sdm.md">Performance: How Fast is sdm</a>
